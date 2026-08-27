@@ -146,7 +146,7 @@ generated medium is a reviewed social card documented in
 - [x] Representative Lighthouse evidence recorded; field INP remains unavailable
 - [x] Three independent gauntlet reviews meet every minimum (lowest 94/100)
 - [x] Current screenshots generated only by the passing QA runner
-- [ ] Public repository, exact commit, license, and CI verified
+- [x] Public repository, exact feature-branch commit, MIT license, and PR CI verified
 - [ ] Public URL deployed and tested in a judge-equivalent session
 - [ ] Public demo video with audible English narration uploaded
 - [ ] Devpost form reviewed by the participant
