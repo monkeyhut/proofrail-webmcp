@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
@@ -151,6 +152,7 @@ function annotatedParagraph(
         }
         onClick={() => onSelect(match.claim.id)}
         aria-pressed={selectedClaimId === match.claim.id}
+        aria-controls="evidence-decision"
       >
         {match.claim.text}
         <span>{match.claim.number}</span>
@@ -186,7 +188,11 @@ export function ProofRailApp() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptPending, setReceiptPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const importDialogRef = useRef<HTMLElement>(null);
+  const receiptDialogRef = useRef<HTMLElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
   const [importTitle, setImportTitle] = useState("Untitled review packet");
   const [importHeadline, setImportHeadline] = useState(
     "A draft waiting for evidence.",
@@ -209,6 +215,70 @@ export function ProofRailApp() {
   const selectedEdges = selectedClaim
     ? workspace.edges.filter((edge) => edge.claimId === selectedClaim.id)
     : [];
+  const receiptModalOpen = receiptOpen && Boolean(workspace.receipt);
+  const importModalOpen = importOpen && !receiptModalOpen;
+
+  useEffect(() => {
+    if (!importModalOpen && !receiptModalOpen) return;
+
+    const dialog = receiptModalOpen
+      ? receiptDialogRef.current
+      : importDialogRef.current;
+    if (!dialog) return;
+    const activeDialog = dialog;
+
+    lastFocusedRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const getFocusable = () =>
+      Array.from(
+        activeDialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+    queueMicrotask(() => (getFocusable()[0] ?? activeDialog).focus());
+
+    function handleDialogKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (receiptModalOpen) setReceiptOpen(false);
+        else setImportOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        activeDialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeydown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeydown);
+      document.body.style.overflow = previousOverflow;
+      if (lastFocusedRef.current?.isConnected) {
+        lastFocusedRef.current.focus();
+      }
+    };
+  }, [importModalOpen, receiptModalOpen]);
 
   useEffect(() => {
     const context = document.modelContext;
@@ -494,6 +564,7 @@ export function ProofRailApp() {
             }
             return storeReceipt(current, receipt);
           });
+          setImportOpen(false);
           setReceiptOpen(true);
           setNotice("Proof receipt " + receipt.receiptId + " created.");
           return {
@@ -574,7 +645,10 @@ export function ProofRailApp() {
           ? "Human approval recorded. The draft and gate were recomputed."
           : "Human rejection recorded. The blocker remains visible.",
       );
-      if (next.receipt) setReceiptOpen(true);
+      if (next.receipt) {
+        setImportOpen(false);
+        setReceiptOpen(true);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to decide.");
     }
@@ -617,6 +691,8 @@ export function ProofRailApp() {
   }
 
   async function generateReceipt() {
+    if (receiptPending) return;
+    setReceiptPending(true);
     try {
       const source = workspaceRef.current;
       const receipt = await createProofReceipt(source);
@@ -628,12 +704,15 @@ export function ProofRailApp() {
         }
         return storeReceipt(current, receipt);
       });
+      setImportOpen(false);
       setReceiptOpen(true);
       setNotice("Proof receipt " + receipt.receiptId + " created.");
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Unable to create receipt.",
       );
+    } finally {
+      setReceiptPending(false);
     }
   }
 
@@ -646,7 +725,12 @@ export function ProofRailApp() {
 
   return (
     <main className="proofrail-shell">
-      <header className="topbar">
+      <div
+        className="app-surface"
+        inert={importModalOpen || receiptModalOpen ? true : undefined}
+        aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
+      >
+        <header className="topbar">
         <a className="wordmark" href="#workspace" aria-label="ProofRail home">
           <span className="wordmark-mark" aria-hidden="true">
             PR
@@ -677,7 +761,16 @@ export function ProofRailApp() {
             <strong>{gate.blockers.length} blockers</strong>
           </button>
         </div>
-      </header>
+        </header>
+
+        <div className="mobile-actions" aria-label="Workspace actions">
+          <button className="quiet-action" onClick={() => setImportOpen(true)}>
+            New packet
+          </button>
+          <button className="quiet-action" onClick={resetDemo}>
+            Reset demo
+          </button>
+        </div>
 
       {toolsOpen && (
         <section className="tool-drawer" aria-label="ProofRail site tools">
@@ -713,8 +806,12 @@ export function ProofRailApp() {
         <div>
           <p className="kicker">Pre-publication evidence control</p>
           <h1 id="page-title">
-            Make every public claim
-            <span> earn its release.</span>
+            <span className="intro-line">
+              <span className="intro-line-inner">Make every public claim</span>
+            </span>
+            <span className="intro-line intro-line-accent">
+              <span className="intro-line-inner">earn its release.</span>
+            </span>
           </h1>
         </div>
         <div className="intro-copy">
@@ -724,6 +821,10 @@ export function ProofRailApp() {
           </p>
           <div
             className="progress-line"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={workspace.claims.length}
+            aria-valuenow={gate.releasableClaims}
             aria-label={
               gate.releasableClaims +
               " of " +
@@ -732,6 +833,8 @@ export function ProofRailApp() {
             }
           >
             <span
+              key={gate.releasableClaims}
+              className="progress-fill"
               style={{
                 width:
                   (workspace.claims.length
@@ -812,6 +915,12 @@ export function ProofRailApp() {
                 }
                 onClick={() => setSelectedClaimId(claim.id)}
                 aria-pressed={selectedClaimId === claim.id}
+                aria-controls="evidence-decision"
+                style={
+                  {
+                    "--rail-delay": `${140 + index * 65}ms`,
+                  } as CSSProperties
+                }
               >
                 <span className="node-path" aria-hidden="true">
                   <span className="node-dot" />
@@ -847,7 +956,11 @@ export function ProofRailApp() {
           </div>
         </section>
 
-        <aside className="evidence-panel" aria-labelledby="evidence-heading">
+        <aside
+          className="evidence-panel"
+          id="evidence-decision"
+          aria-labelledby="evidence-heading"
+        >
           <div className="panel-heading compact">
             <div>
               <span className="panel-index">C</span>
@@ -863,7 +976,7 @@ export function ProofRailApp() {
           </div>
 
           {selectedClaim ? (
-            <div className="decision-body">
+            <div className="decision-body" key={selectedClaim.id}>
               <div className="claim-focus">
                 <span className="focus-id">
                   Claim C-{selectedClaim.number} · {selectedClaim.risk} risk
@@ -986,7 +1099,13 @@ export function ProofRailApp() {
         </aside>
       </section>
 
-      <section className="release-band" aria-labelledby="release-title">
+      <section
+        className={
+          "release-band " +
+          (gate.status === "pass" ? "is-pass" : "is-blocked")
+        }
+        aria-labelledby="release-title"
+      >
         <div className="gate-signal" aria-hidden="true">
           <span className={gate.status === "pass" ? "open" : ""} />
         </div>
@@ -1008,10 +1127,13 @@ export function ProofRailApp() {
         </div>
         <button
           className="receipt-button"
-          disabled={gate.status !== "pass"}
+          disabled={gate.status !== "pass" || receiptPending}
+          aria-busy={receiptPending}
           onClick={() => void generateReceipt()}
         >
-          {gate.status !== "pass"
+          {receiptPending
+            ? "Sealing proof receipt…"
+            : gate.status !== "pass"
             ? "Proof receipt locked"
             : "Generate proof receipt"}
           <span aria-hidden="true">↗</span>
@@ -1047,21 +1169,24 @@ export function ProofRailApp() {
         </ol>
       </section>
 
-      <footer className="site-footer">
+        <footer className="site-footer">
         <p>
           ProofRail does not decide truth. It makes evidence gaps, revisions, and
           human decisions explicit before publication.
         </p>
         <span>Local-first prototype · no account · no API key</span>
-      </footer>
+        </footer>
+      </div>
 
-      {importOpen && (
+      {importModalOpen && (
         <div className="modal-backdrop" role="presentation">
           <section
+            ref={importDialogRef}
             className="import-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="import-title"
+            tabIndex={-1}
           >
             <div className="modal-heading">
               <div>
@@ -1110,13 +1235,15 @@ export function ProofRailApp() {
         </div>
       )}
 
-      {receiptOpen && workspace.receipt && (
+      {receiptModalOpen && workspace.receipt && (
         <div className="modal-backdrop receipt-backdrop" role="presentation">
           <section
+            ref={receiptDialogRef}
             className="receipt-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="receipt-title"
+            tabIndex={-1}
           >
             <div className="receipt-seal">
               <span>PASS</span>
