@@ -51,13 +51,13 @@ auditable boundary between agent assistance and human publishing authority.
 
 | Time | Picture | Narration |
 | --- | --- | --- |
-| 0:00–0:12 | Hero definition and launch-page preview, then “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “Before a project page, blog post, launch page, or report goes live, ProofRail previews it and checks every factual claim against its evidence.” |
+| 0:00–0:12 | Hero definition and launch-page preview, then “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “Before a launch page, project page, blog post, or report goes live, ProofRail previews it and checks every factual claim against its evidence.” |
 | 0:12–0:28 | Open available site tools | “The page exposes six WebMCP tools over the same live state the human sees.” |
 | 0:28–0:48 | Agent calls get_review_context | “The agent sees exact claim revisions and typed evidence—not a screenshot.” |
 | 0:48–1:06 | Agent calls stage_resolution_batch; preview switches from current draft to clearly labelled unapproved AI wording | “It narrows two claims and shows how the page could read, but it cannot approve its own work.” |
 | 1:06–1:25 | Human approves C-01 and rejects C-04; the live preview retains only the accepted wording | “The human accepts one and rejects one. The public preview follows that authority boundary immediately.” |
 | 1:25–1:44 | Agent re-reads and stages a new C-04 proposal | “The agent adapts to the new revision instead of overwriting it.” |
-| 1:44–1:58 | Human approves; the rail clears in the 3D gate view | “Deterministic rules now pass all four claims.” |
+| 1:44–1:58 | Human approves; the live publication header and dedicated publish-gate panel switch from locked to cleared | “Deterministic rules now pass all four claims.” |
 | 1:58–2:12 | Agent exports receipt; publication type, headline, final body, hash, and matrix appear | “The exact approved preview, evidence matrix, decisions, and SHA-256 hash become one proof receipt.” |
 | 2:12–2:25 | Load unseen Arbor draft | “And it is not hard-coded: an unseen draft becomes a fresh blocked claim rail through the same tools.” |
 
@@ -91,6 +91,17 @@ ProofRail treats language like deployable code: evidence edges are tests,
 staged rewrites are patches, human approval is protected review, and the proof
 receipt is the build artifact.
 
+### Visual execution
+
+The opening frame explains the product and shows the real launch-page output at
+the same time. Each accepted input has its own publication grammar: project
+case study, editorial blog, launch page, or formal report. The active interface
+uses no decorative 3D model or generated film; its cinematic motion comes from
+masked typography, ruled layouts, and the actual draft → evidence → human →
+publish state change. Several MotionSites member examples informed editorial
+scale, asymmetric composition, workflow logic, and controlled transitions;
+none of their prompts, code, or hosted assets is copied.
+
 ## Submission checklist
 
 - [x] Functional WebMCP implementation
@@ -99,11 +110,12 @@ receipt is the build artifact.
 - [x] Public repository with GitHub-detected MIT license
 - [x] Reproducible local verification commands
 - [x] Social preview artwork
+- [x] Refreshed desktop and narrow-layout submission screenshots
 - [x] Public GitHub repository URL
 - [x] Source-level clarity heuristic at 100/100 in the local gauntlet
 - [ ] Public live deployment URL and judge-equivalent WebMCP re-test
 - [ ] Public YouTube demo with audio, under three minutes
-- [ ] Devpost description, screenshots, URLs, and final submit
+- [ ] Devpost URLs and final submit
 
 Do not mark the remaining items complete without checking the real public
 targets. See `docs/CHALLENGE_COMPLIANCE.md` for the official requirement matrix.

@@ -4,6 +4,7 @@ import {
   attachEvidence,
   buildPublicationPreview,
   candidateClaimsFromDraft,
+  changePublicationType,
   createDemoWorkspace,
   createProofReceipt,
   decideProposal,
@@ -13,6 +14,7 @@ import {
   storeReceipt,
   verifyReleaseGate,
 } from "../lib/proofrail.ts";
+import { extractPublicationMetric } from "../lib/publication-metrics.ts";
 
 let workspace = createDemoWorkspace();
 let gate = verifyReleaseGate(workspace);
@@ -128,7 +130,7 @@ assert.equal(receipt.contentHash.length, 64);
 assert.equal(receipt.matrix.length, 4);
 assert.equal(receipt.sourceWorkspaceRevision, workspace.revision);
 assert.equal(receipt.publicationType, "launch-page");
-assert.equal(receipt.previewTemplateVersion, 1);
+assert.equal(receipt.previewTemplateVersion, 2);
 assert.equal(receipt.headline, workspace.headline);
 assert.equal(receipt.matrix[0].claimLocation, "headline");
 assert.equal(receipt.matrix[0].evidence[0].sourceType, "internal-study");
@@ -163,6 +165,15 @@ assert.equal(
   buildPublicationPreview(workspace, "current").sealedContentRevision,
   receipt.sourceWorkspaceRevision,
 );
+const reportLayoutWorkspace = changePublicationType(workspace, "report");
+assert.equal(reportLayoutWorkspace.publicationType, "report");
+assert.equal(reportLayoutWorkspace.revision, workspace.revision + 1);
+assert.equal(reportLayoutWorkspace.receipt, undefined);
+assert.equal(
+  reportLayoutWorkspace.audit.at(-1)?.action,
+  "PUBLICATION_FORMAT_CHANGED",
+);
+assert.equal(verifyReleaseGate(reportLayoutWorkspace).status, "pass");
 
 const unknownDraft =
   "The Arbor pilot enrolled twelve teams. The first review cycle took nineteen minutes. Public exports remain available without an account.";
@@ -595,9 +606,9 @@ assert.equal(
 );
 
 for (const publicationType of [
+  "launch-page",
   "project-page",
   "blog-post",
-  "launch-page",
   "report",
 ] as const) {
   const typedWorkspace = { ...createDemoWorkspace(), publicationType };
@@ -606,6 +617,25 @@ for (const publicationType of [
   assert.equal(projection.headline, typedWorkspace.headline);
   assert.equal(projection.body, typedWorkspace.draftText);
 }
+
+assert.deepEqual(
+  extractPublicationMetric("Handoff time fell by 42%.", "No extra metric."),
+  { value: "42%", visualPercent: 42 },
+);
+assert.deepEqual(
+  extractPublicationMetric(
+    "A field study across 12 buildings.",
+    "The unit must remain attached.",
+  ),
+  { value: "12 buildings", visualPercent: null },
+);
+assert.equal(
+  extractPublicationMetric(
+    "A qualitative finding without a number.",
+    "No decorative KPI should be invented.",
+  ),
+  null,
+);
 
 console.log(
   JSON.stringify(

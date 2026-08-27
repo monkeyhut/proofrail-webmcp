@@ -10,8 +10,8 @@ this working checklist.
 | Criterion | ProofRail evidence |
 | --- | --- |
 | WebMCP Leverage | Six narrow page-owned tools cover live draft inspection, evidence attachment, revision-locked proposals, gate verification, and receipt export. Human approval is deliberately not exposed as a tool. |
-| Execution | The working UI shows the complete publication in a live simulated layout, plus the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, mobile, and browser checks are repeatable. |
-| Potential Impact | Marketing and PR teams can preview and control factual claims in project pages, blog posts, launch pages, and reports before those words reach the public. |
+| Execution | The working UI shows the complete publication in four type-specific simulated layouts, plus the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, narrow-viewport, desktop-browser, and no-overflow checks are repeatable. The active UI loads no decorative video or 3D runtime. |
+| Potential Impact | Marketing and PR teams can preview and control factual claims in launch pages, project pages, blog posts, and reports before those words reach the public. |
 | Creativity & Ambition | ProofRail applies CI concepts—tests, patches, protected review, and build receipts—to public language without pretending that an agent is a truth oracle. |
 
 ## Required deliverables
@@ -20,7 +20,7 @@ this working checklist.
 | --- | --- | --- |
 | Working live URL | ChatGPT Sites project exists; final public deployment and WebMCP re-test are still required. | OPEN |
 | Public repository | `https://github.com/monkeyhut/proofrail-webmcp` is public. GitHub detects the MIT license. Final challenge commit must land on the default branch. | IN REVIEW |
-| Complete source, assets, and instructions | Source, generated media, local setup, six-tool manifest, tests, threat model, and asset provenance are versioned. | PASS |
+| Complete source, assets, and instructions | Source, local setup, six-tool manifest, tests, threat model, active social card, refreshed desktop/mobile screenshots, and provenance for both active and rejected media explorations are versioned. | PASS |
 | Text description | `docs/CHALLENGE_SUBMISSION.md` covers WebMCP fit, human-agent benefit, implementation, impact, and limitations. | PASS |
 | Public YouTube demo under 3 minutes | A 2:25 shot-by-shot script exists. Final recording must show the live WebMCP flow and include English audio. | OPEN |
 | Browser-accessible WebMCP | Six tools were discovered and exercised locally in the Codex in-app browser. Repeat against the public URL before submission. | IN REVIEW |

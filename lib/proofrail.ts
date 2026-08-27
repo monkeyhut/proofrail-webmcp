@@ -107,7 +107,7 @@ export type ProofReceipt = {
   sourceWorkspaceRevision: number;
   contentHash: string;
   publicationType: PublicationType;
-  previewTemplateVersion: 1;
+  previewTemplateVersion: 2;
   title: string;
   headline: string;
   finalText: string;
@@ -292,7 +292,7 @@ const initialEdges: EvidenceEdge[] = [
     id: "edge-04",
     claimId: "claim-04",
     evidenceId: "evidence-04",
-    relation: "outdated",
+    relation: "contradicts",
     rationale:
       "The source counts people on a 2024 waitlist, not current teams or customers.",
   },
@@ -354,6 +354,29 @@ export function createDemoWorkspace(): Workspace {
         detail: "Human review approved the linked evidence for claim-02 and claim-03.",
         workspaceRevision: 7,
       },
+    ],
+  };
+}
+
+export function changePublicationType(
+  workspace: Workspace,
+  publicationType: PublicationType,
+): Workspace {
+  if (workspace.publicationType === publicationType) return workspace;
+
+  return {
+    ...workspace,
+    publicationType,
+    revision: workspace.revision + 1,
+    receipt: undefined,
+    audit: [
+      ...workspace.audit,
+      auditEvent(
+        workspace,
+        "human",
+        "PUBLICATION_FORMAT_CHANGED",
+        `Preview format changed from ${workspace.publicationType} to ${publicationType}. Any prior receipt was invalidated.`,
+      ),
     ],
   };
 }
@@ -762,9 +785,9 @@ export function replaceReviewPacket(
   const headline = input.headline.trim();
   const draftText = input.draftText.trim();
   const publicationTypes = new Set<PublicationType>([
+    "launch-page",
     "project-page",
     "blog-post",
-    "launch-page",
     "report",
   ]);
   if (!publicationTypes.has(input.publicationType)) {
@@ -1353,7 +1376,7 @@ export async function createProofReceipt(
   const proofContent = {
     sourceWorkspaceRevision: workspace.revision,
     publicationType: workspace.publicationType,
-    previewTemplateVersion: 1 as const,
+    previewTemplateVersion: 2 as const,
     title: workspace.title,
     headline: workspace.headline,
     finalText: workspace.draftText,

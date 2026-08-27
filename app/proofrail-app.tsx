@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveClaimEvidence,
   attachEvidence,
   candidateClaimsFromDraft,
+  changePublicationType,
   createDemoWorkspace,
   createProofReceipt,
   decideProposal,
@@ -23,7 +16,6 @@ import {
   storeReceipt,
   verifyReleaseGate,
   type AttachEvidenceInput,
-  type EvidenceRelation,
   type PublicationPreviewVariant,
   type PublicationType,
   type ProofReceipt,
@@ -32,71 +24,14 @@ import {
   type StageResolutionInput,
   type Workspace,
 } from "../lib/proofrail";
-import { PublicationPreview } from "./publication-preview";
-
-const ProofArtifact = lazy(async () => {
-  const artifactModule = await import("./proof-artifact");
-  return { default: artifactModule.ProofArtifact };
-});
-
-function ArtifactFallback() {
-  return (
-    <div className="artifact-stage artifact-stage-loading" aria-hidden="true">
-      <div className="artifact-loading-mark" />
-      <span>Loading realtime object</span>
-    </div>
-  );
-}
-
-function DeferredProofArtifact({
-  releaseState,
-}: {
-  releaseState: "blocked" | "cleared";
-}) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount || ready) return;
-    if (typeof IntersectionObserver === "undefined") {
-      const fallbackTimer = globalThis.setTimeout(() => setReady(true), 0);
-      return () => globalThis.clearTimeout(fallbackTimer);
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        setReady(true);
-        observer.disconnect();
-      },
-      { rootMargin: "320px" },
-    );
-    observer.observe(mount);
-    return () => observer.disconnect();
-  }, [ready]);
-
-  return (
-    <div className="artifact-deferred" ref={mountRef}>
-      {ready ? (
-        <Suspense fallback={<ArtifactFallback />}>
-          <ProofArtifact releaseState={releaseState} />
-        </Suspense>
-      ) : (
-        <ArtifactFallback />
-      )}
-    </div>
-  );
-}
+import {
+  PublicationPreview,
+  type BrandDirection,
+  type HeroFocalPoint,
+  type PreviewProfile,
+} from "./publication-preview";
 
 type ToolStatus = "checking" | "registered" | "unsupported" | "error";
-
-const relationLabel: Record<EvidenceRelation, string> = {
-  supports: "supports",
-  qualifies: "qualifies",
-  contradicts: "contradicts",
-  outdated: "outdated",
-};
 
 const toolManifest = [
   {
@@ -131,104 +66,64 @@ const toolManifest = [
   },
 ] as const;
 
-function CinematicVideo({
-  src,
-  className = "",
-  eager = false,
-}: {
-  src: string;
-  className?: string;
-  eager?: boolean;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [sourceEnabled, setSourceEnabled] = useState(false);
-  const [ready, setReady] = useState(false);
+const demoPreviewProfile: PreviewProfile = {
+  brandName: "Northstar",
+  direction: "precision",
+  industry: "Launch operations",
+  audience: "Marketing and product teams",
+  author: "Northstar launch team",
+  publishedLabel: "August 27, 2026",
+  ctaLabel: "Request access",
+  subjectName: "Northstar",
+  heroFocalPoint: "center",
+};
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+const subjectLabels: Record<PublicationType, string> = {
+  "launch-page": "Product / release name",
+  "project-page": "Client / project subject",
+  "blog-post": "Series / article subject",
+  report: "Study / programme name",
+};
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const desktopViewport = window.matchMedia("(min-width: 781px)");
-    let activationTimer: number | undefined;
+const authorLabels: Record<PublicationType, string> = {
+  "launch-page": "Launch owner / team",
+  "project-page": "Studio / project author",
+  "blog-post": "Article author",
+  report: "Author / institution",
+};
 
-    const enableSource = () => {
-      if (reduceMotion.matches || !desktopViewport.matches) return;
-      setSourceEnabled(true);
-    };
+type ReplacePacketToolInput = ReplacePacketInput & {
+  presentationProfile?: {
+    brandName?: string;
+    direction?: BrandDirection;
+    industry?: string;
+    audience?: string;
+    author?: string;
+    publishedLabel?: string;
+    ctaLabel?: string;
+    subjectName?: string;
+  };
+};
 
-    if (eager) {
-      const scheduleActivation = () => {
-        activationTimer = window.setTimeout(enableSource, 1200);
-      };
-      if (document.readyState === "complete") scheduleActivation();
-      else window.addEventListener("load", scheduleActivation, { once: true });
-
-      return () => {
-        window.removeEventListener("load", scheduleActivation);
-        if (activationTimer) window.clearTimeout(activationTimer);
-      };
-    }
-
-    const activationObserver = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting || entry.intersectionRatio <= 0) return;
-        enableSource();
-        activationObserver.disconnect();
-      },
-      { threshold: 0.02 },
-    );
-    activationObserver.observe(video);
-
-    return () => {
-      activationObserver.disconnect();
-      if (activationTimer) window.clearTimeout(activationTimer);
-    };
-  }, [eager]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !sourceEnabled) return;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !reduceMotion.matches) {
-        void video.play().catch(() => undefined);
-      } else {
-        video.pause();
-      }
-    });
-
-    const syncMotionPreference = () => {
-      if (reduceMotion.matches) video.pause();
-    };
-
-    reduceMotion.addEventListener("change", syncMotionPreference);
-    observer.observe(video);
-
-    return () => {
-      reduceMotion.removeEventListener("change", syncMotionPreference);
-      observer.disconnect();
-    };
-  }, [sourceEnabled]);
-
-  return (
-    <video
-      ref={videoRef}
-      className={className}
-      src={sourceEnabled ? src : undefined}
-      data-film-ready={ready ? "true" : "false"}
-      onCanPlay={() => setReady(true)}
-      muted
-      loop
-      playsInline
-      preload="none"
-      aria-hidden="true"
-    />
-  );
+function toolPreviewProfile(input: ReplacePacketToolInput): PreviewProfile {
+  const profile = input.presentationProfile;
+  return {
+    brandName: profile?.brandName?.trim() || "Your company",
+    direction: profile?.direction ?? "precision",
+    industry: profile?.industry?.trim() || "General",
+    audience: profile?.audience?.trim() || "Public audience",
+    author: profile?.author?.trim() || "Editorial team",
+    publishedLabel: profile?.publishedLabel?.trim() || "Draft",
+    ctaLabel: profile?.ctaLabel?.trim() || "Learn more",
+    subjectName: profile?.subjectName?.trim() || undefined,
+    heroFocalPoint: "center",
+  };
 }
 
-function reviewContextSnapshot(workspace: Workspace) {
+function reviewContextSnapshot(
+  workspace: Workspace,
+  presentationProfile: PreviewProfile,
+) {
   const gate = verifyReleaseGate(workspace);
   return {
     workspace: {
@@ -239,6 +134,7 @@ function reviewContextSnapshot(workspace: Workspace) {
       draftText: workspace.draftText,
       revision: workspace.revision,
     },
+    presentationProfile,
     claims: workspace.claims.map((claim) => ({
       id: claim.id,
       text: claim.text,
@@ -309,6 +205,25 @@ export function ProofRailApp() {
   );
   const [previewVariant, setPreviewVariant] =
     useState<PublicationPreviewVariant>("current");
+  const [previewMode, setPreviewMode] = useState<"public" | "proof">("public");
+  const [previewProfile, setPreviewProfile] =
+    useState<PreviewProfile>(demoPreviewProfile);
+  const previewProfileRef = useRef(previewProfile);
+  const [importBrandName, setImportBrandName] = useState("Your company");
+  const [importDirection, setImportDirection] =
+    useState<BrandDirection>("precision");
+  const [importIndustry, setImportIndustry] = useState("Technology");
+  const [importAudience, setImportAudience] = useState("Customers and press");
+  const [importAuthor, setImportAuthor] = useState("Editorial team");
+  const [importPublishedLabel, setImportPublishedLabel] = useState(
+    "August 27, 2026",
+  );
+  const [importCtaLabel, setImportCtaLabel] = useState("Learn more");
+  const [importSubjectName, setImportSubjectName] = useState("Not specified");
+  const [importHeroAssetUrl, setImportHeroAssetUrl] = useState<string>();
+  const [importHeroAssetAlt, setImportHeroAssetAlt] = useState("");
+  const [importHeroFocalPoint, setImportHeroFocalPoint] =
+    useState<HeroFocalPoint>("center");
 
   const commit = useCallback((transition: (current: Workspace) => Workspace) => {
     const next = transition(workspaceRef.current);
@@ -416,26 +331,30 @@ export function ProofRailApp() {
         name: "get_review_context",
         title: "Read review context",
         description:
-          "Read the current ProofRail publication type, exact headline and body, atomic claim locations, typed evidence edges, revision numbers, human proposals, and deterministic release gate. This does not change the page.",
+          "Read the current ProofRail publication type, short presentation profile, exact headline and body, atomic claim locations, typed evidence edges, revision numbers, human proposals, and deterministic release gate. This does not change the page.",
         inputSchema: {
           type: "object",
           properties: {},
           additionalProperties: false,
         },
         annotations: { readOnlyHint: true, untrustedContentHint: true },
-        execute: async () => reviewContextSnapshot(workspaceRef.current),
+        execute: async () =>
+          reviewContextSnapshot(
+            workspaceRef.current,
+            previewProfileRef.current,
+          ),
       },
       {
         name: "replace_review_packet",
         title: "Load review packet",
         description:
-          "Replace the local ProofRail workspace with a project page, blog post, launch page, or report plus exact claim spans covering the complete headline and every complete body sentence. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
+          "Replace the local ProofRail workspace with a launch page, project page, blog post, or report plus exact claim spans covering the complete headline and every complete body sentence. An optional presentationProfile supplies short layout metadata such as brand, audience, art direction, and subject without adding unchecked public prose or invented media. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
         inputSchema: {
           type: "object",
           properties: {
             publicationType: {
               type: "string",
-              enum: ["project-page", "blog-post", "launch-page", "report"],
+              enum: ["launch-page", "project-page", "blog-post", "report"],
             },
             title: { type: "string", minLength: 3, maxLength: 120 },
             headline: { type: "string", minLength: 3, maxLength: 180 },
@@ -462,6 +381,23 @@ export function ProofRailApp() {
               },
             },
             expectedWorkspaceRevision: { type: "integer", minimum: 1 },
+            presentationProfile: {
+              type: "object",
+              properties: {
+                brandName: { type: "string", minLength: 1, maxLength: 80 },
+                direction: {
+                  type: "string",
+                  enum: ["precision", "editorial", "institutional", "kinetic"],
+                },
+                industry: { type: "string", minLength: 1, maxLength: 80 },
+                audience: { type: "string", minLength: 1, maxLength: 100 },
+                author: { type: "string", minLength: 1, maxLength: 100 },
+                publishedLabel: { type: "string", minLength: 1, maxLength: 80 },
+                ctaLabel: { type: "string", minLength: 1, maxLength: 60 },
+                subjectName: { type: "string", minLength: 1, maxLength: 100 },
+              },
+              additionalProperties: false,
+            },
           },
           required: [
             "publicationType",
@@ -475,14 +411,24 @@ export function ProofRailApp() {
         },
         annotations: { untrustedContentHint: true },
         execute: async (input) => {
+          const toolInput = input as unknown as ReplacePacketToolInput;
+          const packetInput: ReplacePacketInput = {
+            publicationType: toolInput.publicationType,
+            title: toolInput.title,
+            headline: toolInput.headline,
+            draftText: toolInput.draftText,
+            claims: toolInput.claims,
+            expectedWorkspaceRevision: toolInput.expectedWorkspaceRevision,
+          };
           const next = commit((current) =>
-            replaceReviewPacket(
-              current,
-              input as unknown as ReplacePacketInput,
-            ),
+            replaceReviewPacket(current, packetInput),
           );
+          const nextPreviewProfile = toolPreviewProfile(toolInput);
+          previewProfileRef.current = nextPreviewProfile;
+          setPreviewProfile(nextPreviewProfile);
           setSelectedClaimId(next.claims[0].id);
           setPreviewVariant("current");
+          setPreviewMode("public");
           setReceiptOpen(false);
           setNotice(
             "Agent loaded " +
@@ -495,6 +441,7 @@ export function ProofRailApp() {
             changed: true,
             workspaceRevision: next.revision,
             claimIds: next.claims.map((claim) => claim.id),
+            presentationProfile: nextPreviewProfile,
             gate: verifyReleaseGate(next),
           };
         },
@@ -736,17 +683,58 @@ export function ProofRailApp() {
     setWorkspace(next);
     setSelectedClaimId("claim-04");
     setPreviewVariant("current");
+    setPreviewMode("public");
+    previewProfileRef.current = demoPreviewProfile;
+    setPreviewProfile(demoPreviewProfile);
     setReceiptOpen(false);
     setNotice("Demo workspace reset to revision 7.");
   }
 
   function inspectClaim(claimId: string) {
+    setPreviewMode("proof");
     setSelectedClaimId(claimId);
     requestAnimationFrame(() => {
       const inspectionBay = document.getElementById("inspection-bay");
       inspectionBay?.scrollIntoView({ block: "start" });
       inspectionBay?.focus({ preventScroll: true });
     });
+  }
+
+  function switchPublicationType(publicationType: PublicationType) {
+    const next = commit((current) =>
+      changePublicationType(current, publicationType),
+    );
+    setPreviewVariant("current");
+    setReceiptOpen(false);
+    setNotice(
+      `Preview rebuilt as ${publicationType.replaceAll("-", " ")} at revision ${next.revision}. Any sealed receipt was invalidated.`,
+    );
+  }
+
+  function loadHeroAsset(file?: File) {
+    if (!file) {
+      setImportHeroAssetUrl(undefined);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setImportError("Hero asset must be an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setImportError("Hero asset must be 8 MB or smaller for this local preview.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        setImportHeroAssetUrl(reader.result);
+        setImportError(null);
+      }
+    });
+    reader.addEventListener("error", () => {
+      setImportError("The hero asset could not be read locally.");
+    });
+    reader.readAsDataURL(file);
   }
 
   function stageDemoResolution(claim: ReviewClaim) {
@@ -859,6 +847,26 @@ export function ProofRailApp() {
       );
       setSelectedClaimId(next.claims[0].id);
       setPreviewVariant("current");
+      setPreviewMode("public");
+      const nextPreviewProfile: PreviewProfile = {
+        brandName: importBrandName.trim() || "Your company",
+        direction: importDirection,
+        industry: importIndustry.trim() || "General",
+        audience: importAudience.trim() || "Public audience",
+        author: importAuthor.trim() || "Editorial team",
+        publishedLabel: importPublishedLabel.trim() || "Draft",
+        ctaLabel: importCtaLabel.trim() || "Learn more",
+        subjectName: importSubjectName.trim() || undefined,
+        heroAssetUrl:
+          importPublicationType === "report" ? undefined : importHeroAssetUrl,
+        heroAssetAlt:
+          importPublicationType === "report"
+            ? undefined
+            : importHeroAssetAlt.trim() || undefined,
+        heroFocalPoint: importHeroFocalPoint,
+      };
+      previewProfileRef.current = nextPreviewProfile;
+      setPreviewProfile(nextPreviewProfile);
       setImportError(null);
       setImportOpen(false);
       setReceiptOpen(false);
@@ -867,6 +875,13 @@ export function ProofRailApp() {
           next.claims.length +
           " unreviewed sentence candidates.",
       );
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const inspectionBay = document.getElementById("inspection-bay");
+          inspectionBay?.scrollIntoView({ block: "start" });
+          inspectionBay?.focus({ preventScroll: true });
+        });
+      });
     } catch (error) {
       setImportError(
         error instanceof Error ? error.message : "Unable to load the packet.",
@@ -914,618 +929,441 @@ export function ProofRailApp() {
         inert={importModalOpen || receiptModalOpen ? true : undefined}
         aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
       >
-        <header className="topbar">
-          <a className="wordmark" href="#page-top">
-            <span className="wordmark-mark" aria-hidden="true">
-              PR
-            </span>
-            <span>ProofRail</span>
+        <header className="rail-nav">
+          <a className="rail-wordmark" href="#page-top" aria-label="ProofRail, back to top">
+            <span aria-hidden="true">PR:</span>
+            <strong>ProofRail</strong>
           </a>
-
-        <div className="topbar-context" aria-label="Current release status">
-          <span className="eyebrow">Pre-publish claim control</span>
-          <span className="context-name">
-            {gate.status === "pass" ? "Release cleared" : "Publication locked"}
-          </span>
-        </div>
-
-        <div className="top-actions">
-          <button
-            className="quiet-action"
-            onClick={() => {
-              setImportError(null);
-              setImportOpen(true);
-            }}
-          >
-            Load draft
-          </button>
-          <button className="quiet-action" onClick={resetDemo}>
-            Reset demo
-          </button>
-          <button
-            className={"session-strip tool-status-" + toolStatus}
-            onClick={() => setToolsOpen((current) => !current)}
-            aria-expanded={toolsOpen}
-            aria-controls="webmcp-tool-drawer"
-            aria-label={`${toolsOpen ? "Close" : "Open"} WebMCP tools. ${statusText[toolStatus]}. ${gate.blockers.length} blockers.`}
-          >
-            <span className="live-dot" aria-hidden="true" />
-            <span>{statusText[toolStatus]}</span>
-            <span className="session-divider" aria-hidden="true" />
-            <strong>{gate.blockers.length} blockers</strong>
-          </button>
-        </div>
-        </header>
-
-      {toolsOpen && (
-        <section
-          className="tool-drawer"
-          id="webmcp-tool-drawer"
-          aria-label="ProofRail site tools"
-        >
-          <div className="tool-drawer-heading">
-            <div>
-              <p className="kicker">WebMCP surface</p>
-              <h2>Six tools. One authority boundary.</h2>
-            </div>
-            <button onClick={() => setToolsOpen(false)} aria-label="Close tools">
-              Close
-            </button>
+          <div className="rail-nav__context" aria-label="Product definition">
+            <span>Pre-publication review</span>
+            <strong>Marketing + PR</strong>
           </div>
-          <div className="tool-grid">
-            {toolManifest.map((tool, index) => (
-              <article key={tool.name}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <code>{tool.name}</code>
-                  <p>{tool.description}</p>
-                </div>
-                <em>{tool.kind}</em>
-              </article>
-            ))}
-          </div>
-          <p className="authority-note">
-            Agent boundary: inspect, connect, and stage. Only a visible human action
-            can approve claim language.
-          </p>
-        </section>
-      )}
-
-      <section className="inspection-hero" aria-labelledby="page-title">
-        <div className="hero-film-layer" aria-hidden="true">
-          <CinematicVideo src="/media/proofrail-block.mp4" eager />
-          <span className="hero-film-wash" />
-        </div>
-        <div className="hero-message">
-          <p className="hero-eyebrow">
-            Pre-publication release gate · for marketing &amp; PR
-          </p>
-          <h1 id="page-title">
-            <span>No proof.</span>
-            <span>No publish.</span>
-          </h1>
-          <p className="hero-definition">
-            <strong>
-              ProofRail is a pre-publication review app for marketing and PR teams.
-            </strong>{" "}
-            Before a project page, blog post, launch page, or report goes live,
-            AI checks every public claim against linked sources. A human approves
-            the exact words and evidence. Until both match, Publish stays locked.
-          </p>
-          <div className="mobile-publication-preview">
-            <PublicationPreview
-              workspace={workspace}
-              selectedClaimId={selectedClaimId}
-              variant={previewVariant}
-              size="compact"
-              onVariantChange={setPreviewVariant}
-              onSelectClaim={inspectClaim}
-            />
-          </div>
-          <ul className="hero-use-cases" aria-label="Content ProofRail reviews">
-            <li>Project page</li>
-            <li>Blog post</li>
-            <li>Launch page</li>
-            <li>Report</li>
-          </ul>
-          <ol className="authority-chain" aria-label="ProofRail release flow">
-            <li>
-              <span>01 · Draft</span>
-              <strong>Project, blog, launch page, or report enters</strong>
-            </li>
-            <li>
-              <span>02 · AI check</span>
-              <strong>Claims are matched to linked sources</strong>
-            </li>
-            <li>
-              <span>03 · Human</span>
-              <strong>You approve the exact words and evidence</strong>
-            </li>
-            <li>
-              <span>04 · Publish</span>
-              <strong>The gate unlocks only when every claim clears</strong>
-            </li>
-          </ol>
-          <div className="hero-tech-line" aria-label="Technical implementation">
-            <span>Live app</span>
-            <span>6 WebMCP tools</span>
-            <span>SHA-256 proof receipt</span>
-          </div>
-          <div className="mobile-actions" aria-label="Workspace actions">
+          <div className="rail-nav__actions">
             <button
-              className="quiet-action"
+              className="rail-nav__import"
               onClick={() => {
                 setImportError(null);
                 setImportOpen(true);
               }}
             >
-              Load a draft
+              Import a draft
             </button>
-            <button className="quiet-action" onClick={resetDemo}>
-              Reset demo
+            <button className="rail-nav__reset" onClick={resetDemo}>
+              Reset
+            </button>
+            <button
+              className={`rail-nav__tools tool-status-${toolStatus}`}
+              onClick={() => setToolsOpen((current) => !current)}
+              aria-expanded={toolsOpen}
+              aria-controls="webmcp-tool-drawer"
+              aria-label={`${toolsOpen ? "Close" : "Open"} WebMCP tools. ${statusText[toolStatus]}. ${gate.blockers.length} blockers.`}
+            >
+              <span className="rail-status-dot" aria-hidden="true" />
+              <span>{statusText[toolStatus]}</span>
+              <strong>{gate.blockers.length}</strong>
             </button>
           </div>
-        </div>
-
-        {selectedClaim && (
-          <article
-            id="inspection-bay"
-            className={
-              "inspection-bay " +
-              (selectedClaimCleared ? "is-cleared" : "is-blocked")
-            }
-            aria-labelledby="inspection-title"
-            tabIndex={-1}
-          >
-            <header className="bay-header">
-              <div>
-                <span>Publication claim before release</span>
-                <strong id="inspection-title">
-                  Claim {selectedClaim.number} · {selectedClaim.risk} risk
-                </strong>
-              </div>
-              <span className="bay-case">{workspace.title}</span>
-            </header>
-
-            <PublicationPreview
-              workspace={workspace}
-              selectedClaimId={selectedClaimId}
-              variant={previewVariant}
-              size="compact"
-              onVariantChange={setPreviewVariant}
-              onSelectClaim={inspectClaim}
-            />
-
-            <div className="source-check">
-              <div className="source-label">
-                <span>What the source proves</span>
-                {selectedEdge && <strong>{relationLabel[selectedEdge.relation]}</strong>}
-              </div>
-              {selectedEvidence ? (
-                <>
-                  <blockquote>“{selectedEvidence.excerpt}”</blockquote>
-                  <footer>
-                    <span>
-                      {selectedEvidence.title} · {selectedEvidence.sourceType.replaceAll("-", " ")}
-                    </span>
-                    <span className="source-provenance">
-                      <time dateTime={selectedEvidence.publishedAt}>
-                        {selectedEvidence.publishedAt}
-                      </time>
-                      {selectedEvidence.sourceUrl && (
-                        <a
-                          href={selectedEvidence.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open source ↗
-                        </a>
-                      )}
-                      {!selectedEvidence.sourceUrl && <em>No source URL supplied</em>}
-                    </span>
-                  </footer>
-                </>
-              ) : (
-                <p className="missing-source">No source is attached to this claim.</p>
-              )}
-            </div>
-
-            <div className="inspection-verdict" aria-live="polite">
-              <span>
-                {selectedClaimCleared ? "Why publish is clear" : "Why publish is blocked"}
-              </span>
-              <strong>
-                {selectedClaimCleared
-                  ? "The language matches the evidence."
-                  : selectedEdge?.rationale ?? "This claim has no usable proof."}
-              </strong>
-            </div>
-
-            {selectedClaim.proposal?.status === "staged" ? (
-              <section className="bay-decision" aria-label="Human decision">
-                <div>
-                  <span>AI-prepared wording</span>
-                  <p>“{selectedClaim.proposal.after}”</p>
-                  <small>Nothing changes until you decide.</small>
-                </div>
-                <div className="bay-human-actions">
-                  <button onClick={() => decideSelected("reject")}>Reject</button>
-                  <button onClick={() => decideSelected("approve")}>
-                    Approve this wording
-                  </button>
-                </div>
-              </section>
-            ) : selectedClaimCleared ? (
-              <div className="bay-cleared-message">
-                <span aria-hidden="true">✓</span>
-                <strong>This claim may continue to the release gate.</strong>
-              </div>
-            ) : selectedClaim.state === "supported" && selectedEvidence ? (
-              <section className="bay-decision" aria-label="Human evidence decision">
-                <div>
-                  <span>Evidence supports this wording</span>
-                  <p>Human release approval is still required.</p>
-                  <small>An agent can attach proof, but it cannot clear the gate.</small>
-                </div>
-                <div className="bay-human-actions">
-                  <button onClick={approveSelectedEvidence}>
-                    Approve evidence and wording
-                  </button>
-                </div>
-              </section>
-            ) : selectedResolution ? (
-              <button
-                className="prepare-button"
-                onClick={() => stageDemoResolution(selectedClaim)}
-              >
-                <span className="prepare-copy">
-                  <strong>Fix this blocked claim</strong>
-                  <small>AI proposes. You approve.</small>
-                </span>
-                <span aria-hidden="true">→</span>
-              </button>
-            ) : (
-              <div className="bay-cleared-message is-waiting">
-                <span aria-hidden="true">!</span>
-                <strong>The agent must attach proof or prepare safer wording.</strong>
-              </div>
-            )}
-
-            <footer className="bay-gate">
-              <div>
-                <span className="gate-lock" aria-hidden="true" />
-                <strong>
-                  Release gate · {gate.status === "pass" ? "unlocked" : "locked"}
-                </strong>
-              </div>
-              <div
-                className="bay-progress"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={workspace.claims.length}
-                aria-valuenow={gate.releasableClaims}
-                aria-label={`${gate.releasableClaims} of ${workspace.claims.length} claims cleared`}
-              >
-                {workspace.claims.map((claim) => (
-                  <span
-                    key={claim.id}
-                    className={
-                      claim.state === "supported" || claim.state === "resolved"
-                        ? "is-clear"
-                        : ""
-                    }
-                  />
-                ))}
-              </div>
-              <span>
-                {gate.releasableClaims} of {workspace.claims.length} claims cleared
-              </span>
-            </footer>
-          </article>
-        )}
-      </section>
-
-      {notice && (
-        <div className="notice" role="status">
-          <span>{notice}</span>
-          <button onClick={() => setNotice(null)} aria-label="Dismiss message">
-            ×
-          </button>
-        </div>
-      )}
-
-      <section
-        id="block-film"
-        className="cinematic-transition cinematic-block"
-        aria-labelledby="block-film-title"
-      >
-        <CinematicVideo src="/media/proofrail-block.mp4" />
-        <div className="cinematic-scrim" aria-hidden="true" />
-        <div className="cinematic-frame" aria-hidden="true">
-          <span>Scan / 01</span>
-          <span>Evidence mismatch</span>
-          <span>Gate locked</span>
-        </div>
-        <div className="cinematic-copy">
-          <p>One sentence. One source. One hard stop.</p>
-          <h2 id="block-film-title">
-            A website claim enters. The source disagrees. Publish stays locked.
-          </h2>
-          <span>
-            “800 launch teams” cannot pass when the source only proves 800
-            waitlist sign-ups.
-          </span>
-        </div>
-      </section>
-
-      <section className="release-queue" id="workspace" aria-labelledby="queue-title">
-        <header className="section-heading">
-          <div>
-            <p className="section-kicker">Inspection queue</p>
-            <h2 id="queue-title">Every claim must clear the same rail.</h2>
-          </div>
-          <p>
-            Pick a claim. ProofRail brings its exact source and release decision
-            into the inspection bay above.
-          </p>
         </header>
 
-        <div className="queue-track">
-          {workspace.claims.map((claim) => {
-            const blocker = gate.blockers.find((item) => item.claimId === claim.id);
-            const cleared = !blocker;
-            return (
-              <button
-                key={claim.id}
-                className={
-                  "queue-claim " +
-                  (cleared ? "is-clear" : "is-blocked") +
-                  (selectedClaimId === claim.id ? " is-active" : "")
-                }
-                onClick={() => inspectClaim(claim.id)}
-                aria-pressed={selectedClaimId === claim.id}
-                aria-controls="inspection-bay"
-              >
-                <span className="queue-number">C-{claim.number}</span>
-                <span className="queue-copy">
-                  <strong>{claim.text}</strong>
-                  <small>
-                    {claim.proposal?.status === "staged"
-                      ? "Waiting for your decision"
-                      : blocker?.code === "HUMAN_APPROVAL_REQUIRED"
-                        ? "Evidence attached · human approval needed"
-                      : cleared
-                        ? "Evidence matched"
-                        : blocker?.detail ?? claim.label}
-                  </small>
-                </span>
-                <span className="queue-verdict">
-                  {cleared ? "Cleared" : "Blocked"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="authority-boundary" aria-labelledby="authority-title">
-        <header className="section-heading inverse">
-          <div>
-            <p className="section-kicker">One hard boundary</p>
-            <h2 id="authority-title">AI prepares. Humans decide. The gate enforces.</h2>
-          </div>
-          <p>
-            ProofRail is not an AI truth oracle. It separates assistance,
-            authority, and release into three visible jobs.
-          </p>
-        </header>
-
-        <div className="role-lane">
-          <article className="role-card role-agent">
-            <span>01 · AI</span>
-            <h3>Inspect and prepare</h3>
-            <p>Read the live draft, attach dated proof, and propose narrower words.</p>
-            <strong>Cannot approve</strong>
-          </article>
-          <article className="role-card role-human">
-            <span>02 · Human</span>
-            <h3>Own the wording</h3>
-            <p>Approve the exact words and linked proof that would appear in public.</p>
-            <strong>The protected decision</strong>
-          </article>
-          <article className="role-card role-system">
-            <span>03 · Gate</span>
-            <h3>Block or release</h3>
-            <p>Apply fixed rules and issue a hashed receipt only after every claim clears.</p>
-            <strong>No confidence theatre</strong>
-          </article>
-        </div>
-      </section>
-
-      <section id="evidence-core" className="evidence-core" aria-labelledby="core-title">
-        <div className="core-copy">
-          <p className="section-kicker">3D / The evidence core</p>
-          <h2 id="core-title">The gate is the product.</h2>
-          <p>
-            ProofRail is not another feed, newsroom, or AI writer. It is the
-            control layer between a draft and the publish button.
-          </p>
-          <dl>
-            <div>
-              <dt>AI</dt>
-              <dd>Inspects and prepares</dd>
-            </div>
-            <div>
-              <dt>Human</dt>
-              <dd>Owns the final words</dd>
-            </div>
-            <div>
-              <dt>System</dt>
-              <dd>Blocks or releases</dd>
-            </div>
-          </dl>
-        </div>
-        <DeferredProofArtifact
-          releaseState={gate.status === "pass" ? "cleared" : "blocked"}
-        />
-      </section>
-
-      <section className="review-packet" aria-labelledby="packet-title">
-        <header className="section-heading">
-          <div>
-            <p className="section-kicker">Live publication preview</p>
-            <h2 id="packet-title">See the public page before it ships.</h2>
-          </div>
-          <p>
-            Switch between the current draft and unapproved AI wording. Every
-            highlighted phrase stays connected to its source and human decision.
-          </p>
-        </header>
-
-        <div className="packet-layout">
-          <PublicationPreview
-            workspace={workspace}
-            selectedClaimId={selectedClaimId}
-            variant={previewVariant}
-            size="full"
-            onVariantChange={setPreviewVariant}
-            onSelectClaim={inspectClaim}
-          />
-
-          <aside
-            className={
-              "release-console " +
-              (gate.status === "pass" ? "is-pass" : "is-blocked")
-            }
-            aria-labelledby="release-title"
+        {toolsOpen && (
+          <section
+            className="rail-tool-drawer"
+            id="webmcp-tool-drawer"
+            aria-label="ProofRail WebMCP tools"
           >
             <header>
-              <span className="console-signal" aria-hidden="true" />
               <div>
-                <p>Release gate</p>
-                <h3 id="release-title">
-                  {gate.status === "pass" ? "Ready to seal." : "Publication locked."}
-                </h3>
+                <p>Agent protocol / six tools</p>
+                <h2>The agent may prepare. It may never approve.</h2>
               </div>
+              <button onClick={() => setToolsOpen(false)} aria-label="Close tools">
+                Close ×
+              </button>
             </header>
-
-            <div className="console-counts">
-              <div>
-                <strong>{gate.releasableClaims}</strong>
-                <span>Claims cleared</span>
-              </div>
-              <div>
-                <strong>{gate.blockers.length}</strong>
-                <span>Blockers left</span>
-              </div>
-              <div>
-                <strong>{gate.openHumanDecisions}</strong>
-                <span>Your decisions</span>
-              </div>
+            <div className="rail-tool-index">
+              {toolManifest.map((tool, index) => (
+                <article key={tool.name}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <code>{tool.name}</code>
+                  <p>{tool.description}</p>
+                  <em>{tool.kind}</em>
+                </article>
+              ))}
             </div>
+          </section>
+        )}
 
-            {gate.blockers.length > 0 ? (
-              <ol className="console-blockers">
-                {gate.blockers.slice(0, 4).map((blocker) => {
-                  const claim = workspace.claims.find(
-                    (candidate) => candidate.id === blocker.claimId,
-                  );
-                  return (
-                    <li key={`${blocker.claimId}-${blocker.code}`}>
-                      <span>C-{claim?.number ?? "--"}</span>
-                      <div>
-                        <strong>{blocker.code.replaceAll("_", " ")}</strong>
-                        <p>{blocker.detail}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : (
-              <div className="receipt-ready">
-                <span aria-hidden="true">✓</span>
+        <section className="rail-hero" aria-labelledby="page-title">
+          <div className="rail-hero__copy">
+            <p className="rail-kicker">
+              <span aria-hidden="true" />
+              The pre-publication workspace for marketing and PR
+            </p>
+            <h1 id="page-title">
+              <span><span>Your page.</span></span>
+              <span><span>Every claim.</span></span>
+              <span className="rail-hero__accent"><span>One human gate.</span></span>
+            </h1>
+            <p className="rail-definition">
+              Before your company publishes a launch page, case study, article, or
+              report, ProofRail renders the actual audience-facing page. AI checks
+              every factual sentence against source evidence and may stage a safer
+              revision. A human makes the final call. Until then, publishing stays
+              locked.
+            </p>
+            <div className="rail-hero__definition" aria-label="ProofRail in one line">
+              <span>Draft in</span>
+              <i aria-hidden="true">→</i>
+              <span>Real page preview</span>
+              <i aria-hidden="true">→</i>
+              <span>Evidence + human approval</span>
+              <i aria-hidden="true">→</i>
+              <strong>Publish</strong>
+            </div>
+            <div className="rail-hero__actions">
+              <button
+                className="rail-button rail-button--light"
+                onClick={() => {
+                  setImportError(null);
+                  setImportOpen(true);
+                }}
+              >
+                Import your draft <span aria-hidden="true">↗</span>
+              </button>
+              <button
+                className="rail-button rail-button--text"
+                onClick={() => inspectClaim("claim-04")}
+              >
+                Turn on proof view <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+            <p className="rail-hero__clarifier">
+              This is not a news site and not a CMS. It is the review room used
+              immediately before public release.
+            </p>
+          </div>
+
+          {selectedClaim && (
+            <article
+              id="inspection-bay"
+              className={`rail-preview-stage ${selectedClaimCleared ? "is-cleared" : "is-blocked"}`}
+              aria-labelledby="inspection-title"
+              tabIndex={-1}
+            >
+              <header className="rail-preview-stage__head">
                 <div>
-                  <strong>All claims cleared</strong>
-                  <p>The final wording, decisions, sources, and hash can now be sealed.</p>
+                  <span>The page your audience would see</span>
+                  <strong id="inspection-title">{workspace.title} · live layout</strong>
+                </div>
+                <div className="rail-preview-stage__gate">
+                  <span aria-hidden="true">{gate.status === "pass" ? "✓" : "×"}</span>
+                  <div>
+                    <strong>{gate.status === "pass" ? "Ready to publish" : "Publish locked"}</strong>
+                    <small>
+                      {gate.blockers.length}{" "}
+                      {gate.blockers.length === 1 ? "blocker" : "blockers"} remain
+                    </small>
+                  </div>
+                </div>
+              </header>
+
+              {previewMode === "proof" && (
+                <aside className="rail-preview-stage__evidence" aria-live="polite">
+                  <div className="rail-preview-stage__claim">
+                    <span>C-{selectedClaim.number} · the page says</span>
+                    <strong>“{selectedClaim.text}”</strong>
+                  </div>
+                  <div className="rail-preview-stage__source">
+                    <span>{selectedEvidence ? "The attached source says" : "Attached source"}</span>
+                    <strong>
+                      {selectedEvidence
+                        ? `“${selectedEvidence.excerpt}”`
+                        : "No usable source is attached."}
+                    </strong>
+                  </div>
+                  <div className="rail-preview-stage__decision">
+                    {selectedClaim.proposal?.status === "staged" ? (
+                      <>
+                        <span>AI proposal · human decision required</span>
+                        <div>
+                          <button onClick={() => decideSelected("reject")}>Reject</button>
+                          <button onClick={() => decideSelected("approve")}>Approve wording</button>
+                        </div>
+                      </>
+                    ) : selectedClaimCleared ? (
+                      <strong className="rail-approved">Human approved · claim cleared</strong>
+                    ) : selectedClaim.state === "supported" && selectedEvidence ? (
+                      <button onClick={approveSelectedEvidence}>Approve evidence + wording</button>
+                    ) : selectedResolution ? (
+                      <button onClick={() => stageDemoResolution(selectedClaim)}>
+                        Prepare evidence-safe wording <span aria-hidden="true">→</span>
+                      </button>
+                    ) : (
+                      <strong>Proof must be attached before approval.</strong>
+                    )}
+                  </div>
+                </aside>
+              )}
+
+              <PublicationPreview
+                workspace={workspace}
+                profile={previewProfile}
+                selectedClaimId={selectedClaimId}
+                variant={previewVariant}
+                mode={previewMode}
+                size="hero"
+                onVariantChange={setPreviewVariant}
+                onModeChange={setPreviewMode}
+                onTypeChange={switchPublicationType}
+                onDirectionChange={(direction) =>
+                  setPreviewProfile((current) => {
+                    const next = { ...current, direction };
+                    previewProfileRef.current = next;
+                    return next;
+                  })
+                }
+                onSelectClaim={inspectClaim}
+              />
+            </article>
+          )}
+        </section>
+
+        {notice && (
+          <div className="rail-notice" role="status">
+            <span>{notice}</span>
+            <button onClick={() => setNotice(null)} aria-label="Dismiss message">×</button>
+          </div>
+        )}
+
+        <section className="rail-method" aria-labelledby="method-title">
+          <header className="rail-section-head">
+            <p>One source in. A defensible publication out.</p>
+            <h2 id="method-title">The logic, without the AI theatre.</h2>
+          </header>
+          <div className="rail-method__grid">
+            <article tabIndex={0}>
+              <span className="rail-method__index">01 / Import</span>
+              <h3>One draft. Four real layouts.</h3>
+              <p>Paste the copy once. ProofRail renders it as the publication you selected.</p>
+              <div className="rail-diagram rail-diagram--formats" aria-hidden="true">
+                <span className="rail-source-sheet">TXT</span>
+                <i />
+                <div>
+                  <span>LAUNCH</span><span>PROJECT</span><span>BLOG</span><span>REPORT</span>
                 </div>
               </div>
+            </article>
+            <article tabIndex={0}>
+              <span className="rail-method__index">02 / AI check</span>
+              <h3>Evidence lines. Not confidence scores.</h3>
+              <p>Each factual sentence must lead to a dated source that actually supports it.</p>
+              <div className="rail-diagram rail-diagram--evidence" aria-hidden="true">
+                <span>CLAIM C-04</span><i /><b>×</b><i /><span>SOURCE</span>
+              </div>
+            </article>
+            <article tabIndex={0}>
+              <span className="rail-method__index">03 / Human gate</span>
+              <h3>AI proposes. People approve.</h3>
+              <p>The model can narrow wording. Only a visible human action can release it.</p>
+              <div className="rail-diagram rail-diagram--gate" aria-hidden="true">
+                <span>DRAFT</span><i /><span>AI</span><i /><b>HUMAN</b><i /><span>PUBLISH</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="rail-workspace" id="workspace" aria-labelledby="workspace-title">
+          <header className="rail-section-head rail-section-head--workspace">
+            <p>Live review workspace</p>
+            <h2 id="workspace-title">Select a sentence. See the proof. Make the call.</h2>
+            <span>
+              This is the actual app: the preview above and every control below share
+              the same live draft state.
+            </span>
+          </header>
+
+          <div className="rail-workspace__grid">
+            <nav className="rail-claims" aria-label="Claims in this publication">
+              <header>
+                <span>Claim index</span>
+                <strong>{workspace.claims.length} sentences</strong>
+              </header>
+              <div>
+                {workspace.claims.map((claim) => {
+                  const blocker = gate.blockers.find((item) => item.claimId === claim.id);
+                  const cleared = !blocker;
+                  return (
+                    <button
+                      key={claim.id}
+                      className={`${cleared ? "is-clear" : "is-blocked"}${selectedClaimId === claim.id ? " is-active" : ""}`}
+                      onClick={() => inspectClaim(claim.id)}
+                      aria-pressed={selectedClaimId === claim.id}
+                      aria-controls="inspection-bay"
+                    >
+                      <span>C-{claim.number}</span>
+                      <strong>{claim.text}</strong>
+                      <small>
+                        {claim.proposal?.status === "staged"
+                          ? "AI wording staged · human decision open"
+                          : blocker?.code === "HUMAN_APPROVAL_REQUIRED"
+                            ? "Source attached · human approval open"
+                            : cleared
+                              ? "Cleared"
+                              : blocker?.detail ?? claim.label}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+
+            {selectedClaim && (
+              <article className="rail-dossier" aria-live="polite">
+                <header>
+                  <div>
+                    <span>Evidence dossier / C-{selectedClaim.number}</span>
+                    <strong>{selectedClaim.risk} risk · {selectedClaim.location}</strong>
+                  </div>
+                  <em>{selectedClaimCleared ? "CLEARED" : "BLOCKED"}</em>
+                </header>
+                <div className="rail-dossier__claim">
+                  <span>Public wording</span>
+                  <blockquote>“{selectedClaim.text}”</blockquote>
+                </div>
+                <div className="rail-dossier__proof">
+                  <span>Attached proof</span>
+                  {selectedEvidence ? (
+                    <>
+                      <strong>{selectedEvidence.title}</strong>
+                      <blockquote>“{selectedEvidence.excerpt}”</blockquote>
+                      <small>
+                        {selectedEdge?.relation.toUpperCase() ?? "UNLINKED"} · {selectedEvidence.sourceType.replaceAll("-", " ")} · {selectedEvidence.publishedAt}
+                      </small>
+                    </>
+                  ) : (
+                    <strong>No source attached. The release gate fails closed.</strong>
+                  )}
+                </div>
+                {selectedClaim.proposal && (
+                  <div className="rail-dossier__proposal">
+                    <span>AI proposal · not approved</span>
+                    <p>{selectedClaim.proposal.after}</p>
+                    <small>{selectedClaim.proposal.rationale}</small>
+                  </div>
+                )}
+                <div className="rail-dossier__actions">
+                  {selectedClaim.proposal?.status === "staged" ? (
+                    <>
+                      <button onClick={() => decideSelected("reject")}>Reject proposal</button>
+                      <button className="is-primary" onClick={() => decideSelected("approve")}>
+                        Approve exact wording
+                      </button>
+                    </>
+                  ) : selectedClaimCleared ? (
+                    <strong className="rail-approved">Human approved · audit event recorded</strong>
+                  ) : selectedClaim.state === "supported" && selectedEvidence ? (
+                    <button className="is-primary" onClick={approveSelectedEvidence}>
+                      Approve evidence + wording
+                    </button>
+                  ) : selectedResolution ? (
+                    <button className="is-primary" onClick={() => stageDemoResolution(selectedClaim)}>
+                      Stage evidence-safe wording
+                    </button>
+                  ) : (
+                    <strong>Agent action required: attach qualifying proof.</strong>
+                  )}
+                </div>
+              </article>
             )}
 
-            <button
-              className="seal-button"
-              disabled={gate.status !== "pass" || receiptPending}
-              aria-busy={receiptPending}
-              onClick={() => void generateReceipt()}
+            <aside
+              className={`rail-gate ${gate.status === "pass" ? "is-pass" : "is-blocked"}`}
+              aria-labelledby="release-title"
             >
-              <span>
-                {receiptPending
-                  ? "Sealing proof receipt…"
-                  : gate.status === "pass"
-                    ? "Seal proof receipt"
-                    : "Receipt stays locked"}
-              </span>
-              <span aria-hidden="true">↗</span>
-            </button>
-          </aside>
-        </div>
-      </section>
+              <header>
+                <p>04 / Publish gate</p>
+                <h3 id="release-title">
+                  {gate.status === "pass" ? "Release cleared." : "Publication locked."}
+                </h3>
+              </header>
+              <dl>
+                <div><dt>Cleared</dt><dd>{gate.releasableClaims}</dd></div>
+                <div><dt>Blocked</dt><dd>{gate.blockers.length}</dd></div>
+                <div><dt>Human calls</dt><dd>{gate.openHumanDecisions}</dd></div>
+              </dl>
+              {gate.blockers.length > 0 ? (
+                <ol>
+                  {gate.blockers.slice(0, 4).map((blocker) => {
+                    const claim = workspace.claims.find((candidate) => candidate.id === blocker.claimId);
+                    return (
+                      <li key={`${blocker.claimId}-${blocker.code}`}>
+                        <span>C-{claim?.number ?? "--"}</span>
+                        <div>
+                          <strong>{blocker.code.replaceAll("_", " ")}</strong>
+                          <p>{blocker.detail}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <div className="rail-gate__ready">
+                  <strong>All claims cleared.</strong>
+                  <p>Final wording, sources, decisions, revision, and hash can be sealed.</p>
+                </div>
+              )}
+              <button
+                className="rail-gate__seal"
+                disabled={gate.status !== "pass" || receiptPending}
+                aria-busy={receiptPending}
+                onClick={() => void generateReceipt()}
+              >
+                <span>
+                  {receiptPending
+                    ? "Sealing proof receipt…"
+                    : gate.status === "pass"
+                      ? "Seal proof receipt"
+                      : "Receipt stays locked"}
+                </span>
+                <span aria-hidden="true">↗</span>
+              </button>
+            </aside>
+          </div>
+        </section>
 
-      <section
-        id="release-film"
-        className="cinematic-transition cinematic-release"
-        aria-labelledby="release-film-title"
-      >
-        <CinematicVideo src="/media/proofrail-release.mp4" />
-        <div className="cinematic-scrim" aria-hidden="true" />
-        <div className="cinematic-frame" aria-hidden="true">
-          <span>Seal / 04</span>
-          <span>Human approved</span>
-          <span>Receipt issued</span>
-        </div>
-        <div className="cinematic-copy">
-          <p>Only after the human says yes.</p>
-          <h2 id="release-film-title">The rail clears. The receipt becomes proof.</h2>
-          <span>
-            Final wording, sources, decisions, revision, and hash travel together.
-          </span>
-        </div>
-      </section>
+        <section className="rail-ledger" aria-label="Decision log">
+          <details>
+            <summary>
+              <span>Audit ledger / current workspace</span>
+              <strong>{workspace.audit.length} recorded events</strong>
+              <em>Open ledger +</em>
+            </summary>
+            <ol>
+              {workspace.audit
+                .slice()
+                .reverse()
+                .slice(0, 8)
+                .map((event) => (
+                  <li key={event.id}>
+                    <span>{event.actor}</span>
+                    <div>
+                      <strong>{event.action.replaceAll("_", " ")}</strong>
+                      <p>{event.detail}</p>
+                    </div>
+                    <span>R{event.workspaceRevision}</span>
+                  </li>
+                ))}
+            </ol>
+          </details>
+        </section>
 
-      <section className="evidence-log" aria-label="Decision log">
-        <details>
-          <summary>
-            <span>Immutable decision log</span>
-            <strong>{workspace.audit.length} recorded events</strong>
-            <em>Open log</em>
-          </summary>
-          <ol className="audit-list">
-            {workspace.audit
-              .slice()
-              .reverse()
-              .slice(0, 8)
-              .map((event) => (
-                <li key={event.id}>
-                  <span className={"actor actor-" + event.actor}>{event.actor}</span>
-                  <div>
-                    <strong>{event.action.replaceAll("_", " ")}</strong>
-                    <p>{event.detail}</p>
-                  </div>
-                  <span>rev. {event.workspaceRevision}</span>
-                </li>
-              ))}
-          </ol>
-        </details>
-      </section>
-
-        <footer className="site-footer">
-        <p>
-          ProofRail does not decide truth. It makes evidence gaps, revisions, and
-          human decisions explicit before publication.
-        </p>
-        <span>
-          Local-first prototype · no account · no API key · cinematic media
-          AI-generated with Higgsfield · 3D artifact generated with Meshy
-        </span>
+        <footer className="rail-footer">
+          <strong>ProofRail does not decide truth.</strong>
+          <p>
+            It makes the page, evidence gaps, revisions, and human decisions visible
+            before anything becomes public.
+          </p>
+          <span>Local-first challenge prototype · no account · no API key · no hidden approval</span>
         </footer>
       </div>
 
@@ -1549,55 +1387,191 @@ export function ProofRailApp() {
                 ×
               </button>
             </div>
-            <label>
-              What are you publishing?
-              <select
-                value={importPublicationType}
-                onChange={(event) =>
-                  setImportPublicationType(event.target.value as PublicationType)
-                }
-              >
-                <option value="project-page">Project page</option>
-                <option value="blog-post">Blog post</option>
-                <option value="launch-page">Launch page</option>
-                <option value="report">Report</option>
-              </select>
-            </label>
-            <label>
-              Packet title
-              <input
-                value={importTitle}
-                maxLength={120}
-                onChange={(event) => setImportTitle(event.target.value)}
-              />
-            </label>
-            <label>
-              Headline
-              <input
-                value={importHeadline}
-                maxLength={180}
-                onChange={(event) => setImportHeadline(event.target.value)}
-              />
-            </label>
-            <label>
-              Draft text
-              <textarea
-                value={importDraft}
-                maxLength={8000}
-                rows={10}
-                onChange={(event) => setImportDraft(event.target.value)}
-              />
-            </label>
+            <section className="import-section" aria-labelledby="import-format-title">
+              <div className="import-section__head">
+                <span>01</span>
+                <div>
+                  <h3 id="import-format-title">What should the public page feel like?</h3>
+                  <p>Format changes the information architecture. Direction changes the brand tone.</p>
+                </div>
+              </div>
+              <div className="import-grid">
+                <label>
+                  Publication format
+                  <select
+                    value={importPublicationType}
+                    onChange={(event) =>
+                      setImportPublicationType(event.target.value as PublicationType)
+                    }
+                  >
+                    <option value="launch-page">Product launch</option>
+                    <option value="project-page">Project / case study</option>
+                    <option value="blog-post">Blog / journal article</option>
+                    <option value="report">Research report</option>
+                  </select>
+                </label>
+                <label>
+                  Art direction
+                  <select
+                    value={importDirection}
+                    onChange={(event) =>
+                      setImportDirection(event.target.value as BrandDirection)
+                    }
+                  >
+                    <option value="precision">Precision tech</option>
+                    <option value="editorial">Editorial human</option>
+                    <option value="institutional">Institutional</option>
+                    <option value="kinetic">Bold consumer</option>
+                  </select>
+                </label>
+                <label>
+                  Brand / company
+                  <input
+                    value={importBrandName}
+                    maxLength={80}
+                    onChange={(event) => setImportBrandName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  {subjectLabels[importPublicationType]}
+                  <input
+                    value={importSubjectName}
+                    maxLength={100}
+                    onChange={(event) => setImportSubjectName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Industry / subject
+                  <input
+                    value={importIndustry}
+                    maxLength={80}
+                    onChange={(event) => setImportIndustry(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Primary audience
+                  <input
+                    value={importAudience}
+                    maxLength={100}
+                    onChange={(event) => setImportAudience(event.target.value)}
+                  />
+                </label>
+                <label>
+                  {authorLabels[importPublicationType]}
+                  <input
+                    value={importAuthor}
+                    maxLength={100}
+                    onChange={(event) => setImportAuthor(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Publication date / version
+                  <input
+                    value={importPublishedLabel}
+                    maxLength={80}
+                    onChange={(event) => setImportPublishedLabel(event.target.value)}
+                  />
+                </label>
+                {importPublicationType !== "report" && (
+                  <label>
+                    Primary CTA
+                    <input
+                      value={importCtaLabel}
+                      maxLength={60}
+                      onChange={(event) => setImportCtaLabel(event.target.value)}
+                    />
+                  </label>
+                )}
+                {importPublicationType !== "report" && (
+                  <>
+                    <label className="import-file">
+                      Real hero / product asset (optional)
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+                        onChange={(event) => loadHeroAsset(event.target.files?.[0])}
+                      />
+                      <small>
+                        {importHeroAssetUrl
+                          ? "Image loaded locally for this preview."
+                          : "No stock image is invented. Without an asset, ProofRail uses a typographic direction."}
+                      </small>
+                    </label>
+                    <label>
+                      Hero image description (alt text)
+                      <input
+                        value={importHeroAssetAlt}
+                        maxLength={180}
+                        onChange={(event) => setImportHeroAssetAlt(event.target.value)}
+                        placeholder="Describe the image only; do not add a new claim"
+                      />
+                    </label>
+                    <label>
+                      Image focus
+                      <select
+                        value={importHeroFocalPoint}
+                        onChange={(event) =>
+                          setImportHeroFocalPoint(event.target.value as HeroFocalPoint)
+                        }
+                      >
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-copy-title">
+              <div className="import-section__head">
+                <span>02</span>
+                <div>
+                  <h3 id="import-copy-title">What exactly are you claiming?</h3>
+                  <p>Every complete public sentence becomes an exact review span.</p>
+                </div>
+              </div>
+              <div className="import-grid import-grid--copy">
+                <label>
+                  Internal packet title
+                  <input
+                    value={importTitle}
+                    maxLength={120}
+                    onChange={(event) => setImportTitle(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Public headline
+                  <input
+                    value={importHeadline}
+                    maxLength={180}
+                    onChange={(event) => setImportHeadline(event.target.value)}
+                  />
+                </label>
+                <label className="import-copy-field">
+                  Public body copy
+                  <textarea
+                    value={importDraft}
+                    maxLength={8000}
+                    rows={9}
+                    onChange={(event) => setImportDraft(event.target.value)}
+                  />
+                </label>
+              </div>
+            </section>
             {importError && (
               <p className="import-error" id="import-error" role="alert">
                 {importError}
               </p>
             )}
             <p className="import-note">
-              ProofRail immediately renders a simulated publication layout. The
-              full headline and every complete body sentence enter review as exact
-              claim spans. A WebMCP agent can submit deliberate risk levels through
-              <code> replace_review_packet</code>.
+              The public view stays clean. The proof overlay exposes exact claims,
+              evidence, staged wording and the human decision boundary. A WebMCP
+              agent can submit deliberate risk levels through
+              <code> replace_review_packet</code> but cannot approve them.
+              Put every factual statement in the public headline or body; profile
+              fields are short layout metadata, not a path around the proof gate.
             </p>
             <button className="modal-primary" onClick={loadImportedPacket}>
               Load unreviewed packet
