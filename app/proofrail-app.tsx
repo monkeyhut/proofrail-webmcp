@@ -1,18 +1,13 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Fragment,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
+  approveClaimEvidence,
   attachEvidence,
   candidateClaimsFromDraft,
-  createDemoWorkspace,
+  MAX_REVIEW_PACKET_CLAIMS,
+  createEmptyWorkspace,
+  createProofRailSelfDemoWorkspace,
   createProofReceipt,
   decideProposal,
   demoResolutions,
@@ -22,31 +17,201 @@ import {
   storeReceipt,
   verifyReleaseGate,
   type AttachEvidenceInput,
-  type EvidenceRecord,
-  type EvidenceRelation,
+  type PublicationPreviewVariant,
+  type PublicationType,
   type ProofReceipt,
   type ReplacePacketInput,
   type ReviewClaim,
   type StageResolutionInput,
   type Workspace,
 } from "../lib/proofrail";
+import {
+  createSourceOnlyPublicationBrief,
+  publicationStructureClaimTargets,
+  type SourceOnlyPublicationStructure,
+} from "../lib/publication-brief";
+import {
+  MAX_HERO_ASSET_BYTES,
+  attachUploadedHeroAsset,
+  extractPublicationText,
+  validatePublicationUrl,
+} from "../lib/publication-import";
+import type {
+  BrandDirection,
+  PreviewProfile,
+} from "./preview-profile";
+import { EmptyStudio } from "./empty-studio";
+import { ReleaseReadiness } from "./release-readiness";
+import { ReviewStudio } from "./review-studio";
 
 type ToolStatus = "checking" | "registered" | "unsupported" | "error";
+type ImportSourceMode = "text" | "url" | "file";
 
-const relationLabel: Record<EvidenceRelation, string> = {
-  supports: "supports",
-  qualifies: "qualifies",
-  contradicts: "contradicts",
-  outdated: "outdated",
+type ImportedTextFile = {
+  fileName: string;
+  mediaType: string;
+  sha256: string;
 };
 
-const sourceTypeLabel: Record<EvidenceRecord["sourceType"], string> = {
-  "internal-study": "Internal study",
-  "engineering-control": "Engineering control",
-  "product-test": "Product test",
-  "public-source": "Public source",
-  archive: "Archive",
+type ImportedHeroAsset = {
+  fileName: string;
+  mediaType: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  sha256: string;
 };
+
+type ImportStructureKey =
+  | "deck"
+  | "productName"
+  | "positioning"
+  | "featureTitle"
+  | "featureBody"
+  | "benefitTitle"
+  | "benefitBody"
+  | "useCaseAudience"
+  | "useCaseOutcome"
+  | "availability"
+  | "pricingOrAccess"
+  | "client"
+  | "project"
+  | "roles"
+  | "scope"
+  | "challenge"
+  | "insight"
+  | "approach"
+  | "systemTitle"
+  | "systemBody"
+  | "implementationTitle"
+  | "implementationBody"
+  | "outcomes"
+  | "credits"
+  | "publication"
+  | "category"
+  | "thesis"
+  | "pullQuote"
+  | "pullQuoteAttribution"
+  | "institution"
+  | "edition"
+  | "abstract"
+  | "executiveSummary"
+  | "findings"
+  | "methodology"
+  | "limitations";
+
+type ImportStructureFields = Record<ImportStructureKey, string>;
+
+const emptyImportStructure: ImportStructureFields = {
+  deck: "",
+  productName: "",
+  positioning: "",
+  featureTitle: "",
+  featureBody: "",
+  benefitTitle: "",
+  benefitBody: "",
+  useCaseAudience: "",
+  useCaseOutcome: "",
+  availability: "",
+  pricingOrAccess: "",
+  client: "",
+  project: "",
+  roles: "",
+  scope: "",
+  challenge: "",
+  insight: "",
+  approach: "",
+  systemTitle: "",
+  systemBody: "",
+  implementationTitle: "",
+  implementationBody: "",
+  outcomes: "",
+  credits: "",
+  publication: "",
+  category: "",
+  thesis: "",
+  pullQuote: "",
+  pullQuoteAttribution: "",
+  institution: "",
+  edition: "",
+  abstract: "",
+  executiveSummary: "",
+  findings: "",
+  methodology: "",
+  limitations: "",
+};
+
+function optionalImportValue(value: string): string | undefined {
+  return value.trim() || undefined;
+}
+
+function importPublicationStructure(
+  publicationType: PublicationType,
+  fields: ImportStructureFields,
+): SourceOnlyPublicationStructure {
+  const common = { deck: optionalImportValue(fields.deck) };
+  switch (publicationType) {
+    case "launch-page":
+      return {
+        ...common,
+        launch: {
+          productName: optionalImportValue(fields.productName),
+          positioning: optionalImportValue(fields.positioning),
+          featureTitle: optionalImportValue(fields.featureTitle),
+          featureBody: optionalImportValue(fields.featureBody),
+          benefitTitle: optionalImportValue(fields.benefitTitle),
+          benefitBody: optionalImportValue(fields.benefitBody),
+          useCaseAudience: optionalImportValue(fields.useCaseAudience),
+          useCaseOutcome: optionalImportValue(fields.useCaseOutcome),
+          availability: optionalImportValue(fields.availability),
+          pricingOrAccess: optionalImportValue(fields.pricingOrAccess),
+        },
+      };
+    case "project-page":
+      return {
+        ...common,
+        caseStudy: {
+          client: optionalImportValue(fields.client),
+          project: optionalImportValue(fields.project),
+          roles: optionalImportValue(fields.roles),
+          scope: optionalImportValue(fields.scope),
+          challenge: optionalImportValue(fields.challenge),
+          insight: optionalImportValue(fields.insight),
+          approach: optionalImportValue(fields.approach),
+          systemTitle: optionalImportValue(fields.systemTitle),
+          systemBody: optionalImportValue(fields.systemBody),
+          implementationTitle: optionalImportValue(fields.implementationTitle),
+          implementationBody: optionalImportValue(fields.implementationBody),
+          outcomes: optionalImportValue(fields.outcomes),
+          credits: optionalImportValue(fields.credits),
+        },
+      };
+    case "blog-post":
+      return {
+        ...common,
+        article: {
+          publication: optionalImportValue(fields.publication),
+          category: optionalImportValue(fields.category),
+          thesis: optionalImportValue(fields.thesis),
+          pullQuote: optionalImportValue(fields.pullQuote),
+          pullQuoteAttribution: optionalImportValue(fields.pullQuoteAttribution),
+        },
+      };
+    case "report":
+      return {
+        ...common,
+        report: {
+          institution: optionalImportValue(fields.institution),
+          edition: optionalImportValue(fields.edition),
+          abstract: optionalImportValue(fields.abstract),
+          executiveSummary: optionalImportValue(fields.executiveSummary),
+          findings: optionalImportValue(fields.findings),
+          methodology: optionalImportValue(fields.methodology),
+          limitations: optionalImportValue(fields.limitations),
+        },
+      };
+  }
+}
 
 const toolManifest = [
   {
@@ -57,12 +222,12 @@ const toolManifest = [
   {
     name: "replace_review_packet",
     kind: "write",
-    description: "Load an arbitrary draft and its exact atomic claim spans.",
+    description: "Load a draft with complete, exact sentence coverage.",
   },
   {
     name: "attach_evidence",
     kind: "write",
-    description: "Attach a dated source excerpt through a typed evidence edge.",
+    description: "Attach a dated source; human release approval still remains.",
   },
   {
     name: "stage_resolution_batch",
@@ -81,22 +246,153 @@ const toolManifest = [
   },
 ] as const;
 
-function reviewContextSnapshot(workspace: Workspace) {
+const selfDemoPreviewProfile: PreviewProfile = {
+  brandName: "ProofRail",
+  direction: "precision",
+  industry: "Publication governance",
+  audience: "Marketing and PR teams",
+  author: "ProofRail product team",
+  publishedLabel: "August 27, 2026",
+  ctaLabel: "Review the release",
+  subjectName: "ProofRail",
+  heroFocalPoint: "center",
+};
+
+const authorLabels: Record<PublicationType, string> = {
+  "launch-page": "Launch owner / team",
+  "project-page": "Studio / project author",
+  "blog-post": "Article author",
+  report: "Author / institution",
+};
+
+type StructureFieldDefinition = {
+  key: ImportStructureKey;
+  label: string;
+  placeholder: string;
+  multiline?: boolean;
+};
+
+const commonStructureField: StructureFieldDefinition = {
+  key: "deck",
+  label: "Deck / standfirst",
+  placeholder: "Exact supporting line from the source publication",
+};
+
+const structureFieldsByType: Record<
+  PublicationType,
+  readonly StructureFieldDefinition[]
+> = {
+  "launch-page": [
+    { key: "productName", label: "Product name", placeholder: "Real public product name" },
+    { key: "positioning", label: "Positioning", placeholder: "Exact supplied positioning line" },
+    { key: "featureTitle", label: "Feature chapter heading", placeholder: "Exact supplied heading" },
+    { key: "featureBody", label: "Feature chapter body", placeholder: "Source-backed feature explanation", multiline: true },
+    { key: "benefitTitle", label: "Benefit chapter heading", placeholder: "Exact supplied heading" },
+    { key: "benefitBody", label: "Benefit chapter body", placeholder: "Only a benefit supported by the source", multiline: true },
+    { key: "useCaseAudience", label: "Use-case audience", placeholder: "Real audience" },
+    { key: "useCaseOutcome", label: "Use-case outcome", placeholder: "Source-backed outcome" },
+    { key: "availability", label: "Availability", placeholder: "Verified availability statement" },
+    { key: "pricingOrAccess", label: "Pricing / access", placeholder: "Verified pricing or access statement" },
+  ],
+  "project-page": [
+    { key: "client", label: "Client", placeholder: "Real client name" },
+    { key: "project", label: "Project", placeholder: "Real project name" },
+    { key: "roles", label: "Roles", placeholder: "One documented role per line", multiline: true },
+    { key: "scope", label: "Scope", placeholder: "One documented scope item per line", multiline: true },
+    { key: "challenge", label: "Challenge", placeholder: "Exact source-backed challenge", multiline: true },
+    { key: "insight", label: "Insight", placeholder: "Exact supplied insight", multiline: true },
+    { key: "approach", label: "Approach", placeholder: "Exact supplied approach", multiline: true },
+    { key: "systemTitle", label: "System-in-use heading", placeholder: "Exact supplied heading" },
+    { key: "systemBody", label: "System in use", placeholder: "Evidence of the system in use", multiline: true },
+    { key: "implementationTitle", label: "Implementation heading", placeholder: "Exact supplied heading" },
+    { key: "implementationBody", label: "Implementation detail", placeholder: "Documented implementation detail", multiline: true },
+    { key: "outcomes", label: "Outcomes", placeholder: "One sourced outcome per line", multiline: true },
+    { key: "credits", label: "Credits", placeholder: "One real credit per line", multiline: true },
+  ],
+  "blog-post": [
+    { key: "publication", label: "Publication / masthead", placeholder: "Real publication name" },
+    { key: "category", label: "Editorial category", placeholder: "Real category" },
+    { key: "thesis", label: "Thesis", placeholder: "Exact human-identified thesis", multiline: true },
+    { key: "pullQuote", label: "Pull quote", placeholder: "Exact quote from supplied copy", multiline: true },
+    { key: "pullQuoteAttribution", label: "Quote attribution", placeholder: "Real attribution" },
+  ],
+  report: [
+    { key: "institution", label: "Issuing institution", placeholder: "Real institution" },
+    { key: "edition", label: "Edition / version", placeholder: "Exact edition or version" },
+    { key: "abstract", label: "Abstract", placeholder: "Supplied abstract", multiline: true },
+    { key: "executiveSummary", label: "Executive summary", placeholder: "Supplied executive summary", multiline: true },
+    { key: "findings", label: "Numbered findings", placeholder: "One per line: Finding title | Exact context", multiline: true },
+    { key: "methodology", label: "Methodology", placeholder: "Documented methodology", multiline: true },
+    { key: "limitations", label: "Limitations", placeholder: "Documented limitations and caveats", multiline: true },
+  ],
+};
+
+type ReplacePacketToolInput = ReplacePacketInput & {
+  presentationProfile?: {
+    brandName?: string;
+    direction?: BrandDirection;
+    industry?: string;
+    audience?: string;
+    author?: string;
+    publishedLabel?: string;
+    ctaLabel?: string;
+    subjectName?: string;
+  };
+};
+
+function toolPreviewProfile(input: ReplacePacketToolInput): PreviewProfile {
+  const profile = input.presentationProfile;
+  return {
+    brandName: profile?.brandName?.trim() || "Not provided",
+    direction: profile?.direction ?? "precision",
+    industry: profile?.industry?.trim() || "Not provided",
+    audience: profile?.audience?.trim() || "Not provided",
+    author: profile?.author?.trim() || "Not provided",
+    publishedLabel: profile?.publishedLabel?.trim() || "Not provided",
+    ctaLabel: profile?.ctaLabel?.trim() || "Not provided",
+    subjectName: profile?.subjectName?.trim() || undefined,
+    heroFocalPoint: "center",
+  };
+}
+
+function reviewContextSnapshot(
+  workspace: Workspace,
+  presentationProfile: PreviewProfile,
+) {
   const gate = verifyReleaseGate(workspace);
+  const safePresentationProfile = {
+    brandName: presentationProfile.brandName,
+    direction: presentationProfile.direction,
+    industry: presentationProfile.industry,
+    audience: presentationProfile.audience,
+    author: presentationProfile.author,
+    publishedLabel: presentationProfile.publishedLabel,
+    ctaLabel: presentationProfile.ctaLabel,
+    subjectName: presentationProfile.subjectName,
+    heroAsset: {
+      present: Boolean(presentationProfile.heroAssetUrl),
+      alt: presentationProfile.heroAssetAlt,
+      focalPoint: presentationProfile.heroFocalPoint,
+    },
+  };
   return {
     workspace: {
       id: workspace.id,
+      publicationType: workspace.publicationType,
       title: workspace.title,
       headline: workspace.headline,
       draftText: workspace.draftText,
       revision: workspace.revision,
     },
+    presentationProfile: safePresentationProfile,
     claims: workspace.claims.map((claim) => ({
       id: claim.id,
       text: claim.text,
+      location: claim.location,
       state: claim.state,
       risk: claim.risk,
       revision: claim.revision,
+      humanApproval: claim.humanApproval,
       proposal: claim.proposal ?? null,
       evidenceEdges: workspace.edges
         .filter((edge) => edge.claimId === claim.id)
@@ -108,58 +404,16 @@ function reviewContextSnapshot(workspace: Workspace) {
         })),
     })),
     gate,
-    receipt: workspace.receipt
+    receipt: (workspace.receipt ?? workspace.invalidatedReceipt)
       ? {
-          receiptId: workspace.receipt.receiptId,
-          sourceWorkspaceRevision: workspace.receipt.sourceWorkspaceRevision,
-          contentHash: workspace.receipt.contentHash,
+          status: workspace.receipt ? "current" : "invalidated",
+          receiptId: (workspace.receipt ?? workspace.invalidatedReceipt)!.receiptId,
+          sourceWorkspaceRevision: (workspace.receipt ?? workspace.invalidatedReceipt)!
+            .sourceWorkspaceRevision,
+          contentHash: (workspace.receipt ?? workspace.invalidatedReceipt)!.contentHash,
         }
       : null,
   };
-}
-
-function annotatedParagraph(
-  paragraph: string,
-  claims: ReviewClaim[],
-  selectedClaimId: string,
-  onSelect: (claimId: string) => void,
-): ReactNode[] {
-  const matches = claims
-    .map((claim) => ({
-      claim,
-      start: paragraph.indexOf(claim.text),
-    }))
-    .filter((match) => match.start >= 0)
-    .sort((a, b) => a.start - b.start);
-
-  if (matches.length === 0) return [paragraph];
-
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  for (const match of matches) {
-    if (match.start < cursor) continue;
-    if (match.start > cursor) {
-      parts.push(paragraph.slice(cursor, match.start));
-    }
-    parts.push(
-      <button
-        key={match.claim.id}
-        className={
-          "claim-inline status-" +
-          match.claim.state +
-          (selectedClaimId === match.claim.id ? " selected" : "")
-        }
-        onClick={() => onSelect(match.claim.id)}
-        aria-pressed={selectedClaimId === match.claim.id}
-      >
-        {match.claim.text}
-        <span>{match.claim.number}</span>
-      </button>,
-    );
-    cursor = match.start + match.claim.text.length;
-  }
-  if (cursor < paragraph.length) parts.push(paragraph.slice(cursor));
-  return parts;
 }
 
 function downloadReceipt(receipt: ProofReceipt) {
@@ -176,24 +430,100 @@ function downloadReceipt(receipt: ProofReceipt) {
   URL.revokeObjectURL(href);
 }
 
-export function ProofRailApp() {
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("FILE_READ_FAILED: image did not produce a data URL."));
+    });
+    reader.addEventListener("error", () =>
+      reject(new Error("FILE_READ_FAILED: image bytes could not be read.")),
+    );
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () =>
+      resolve({ width: image.naturalWidth, height: image.naturalHeight }),
+    );
+    image.addEventListener("error", () =>
+      reject(new Error("INVALID_IMAGE_BYTES: the selected image cannot be decoded.")),
+    );
+    image.src = dataUrl;
+  });
+}
+
+function publicationFileMediaType(file: File): string {
+  const declared = file.type.split(";", 1)[0]?.toLowerCase();
+  if (["text/plain", "text/markdown", "text/x-markdown", "text/html", "application/xhtml+xml"].includes(declared)) {
+    return declared;
+  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".html") || name.endsWith(".htm")) return "text/html";
+  if (name.endsWith(".md") || name.endsWith(".markdown")) return "text/markdown";
+  if (name.endsWith(".txt")) return "text/plain";
+  throw new Error("UNSUPPORTED_PUBLICATION_FILE: use TXT, Markdown, or HTML.");
+}
+
+export function ProofRailApp({ initialDemo = false }: { initialDemo?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace>(() =>
-    createDemoWorkspace(),
+    initialDemo ? createProofRailSelfDemoWorkspace() : createEmptyWorkspace(),
   );
   const workspaceRef = useRef(workspace);
-  const [selectedClaimId, setSelectedClaimId] = useState("claim-04");
+  const [selectedClaimId, setSelectedClaimId] = useState("");
   const [toolStatus, setToolStatus] = useState<ToolStatus>("checking");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptPending, setReceiptPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [importTitle, setImportTitle] = useState("Untitled review packet");
-  const [importHeadline, setImportHeadline] = useState(
-    "A draft waiting for evidence.",
-  );
-  const [importDraft, setImportDraft] = useState(
-    "Paste a short draft here. ProofRail will turn complete sentences into claim candidates for evidence review.",
-  );
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSourceMode, setImportSourceMode] =
+    useState<ImportSourceMode>("text");
+  const [importSourceUrl, setImportSourceUrl] = useState("");
+  const [importTextMediaType, setImportTextMediaType] =
+    useState<"text/plain" | "text/markdown" | "text/html">("text/plain");
+  const [importedTextFile, setImportedTextFile] =
+    useState<ImportedTextFile | null>(null);
+  const importDialogRef = useRef<HTMLElement>(null);
+  const receiptDialogRef = useRef<HTMLElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const [importTitle, setImportTitle] = useState("");
+  const [importHeadline, setImportHeadline] = useState("");
+  const [importPublicationType, setImportPublicationType] =
+    useState<PublicationType>("project-page");
+  const [importDraft, setImportDraft] = useState("");
+  const [previewVariant, setPreviewVariant] =
+    useState<PublicationPreviewVariant>("current");
+  const [previewMode, setPreviewMode] = useState<"public" | "proof">("public");
+  const [previewProfile, setPreviewProfile] =
+    useState<PreviewProfile>(selfDemoPreviewProfile);
+  const previewProfileRef = useRef(previewProfile);
+  const [importBrandName, setImportBrandName] = useState("");
+  const [importAudience, setImportAudience] = useState("");
+  const [importAuthor, setImportAuthor] = useState("");
+  const [importPublishedLabel, setImportPublishedLabel] = useState("");
+  const [importCtaLabel, setImportCtaLabel] = useState("");
+  const [importHeroAsset, setImportHeroAsset] =
+    useState<ImportedHeroAsset | null>(null);
+  const [importHeroAssetAlt, setImportHeroAssetAlt] = useState("");
+  const [importStructure, setImportStructure] =
+    useState<ImportStructureFields>(emptyImportStructure);
+
+  function updateImportStructure(key: ImportStructureKey, value: string) {
+    setImportStructure((current) => ({ ...current, [key]: value }));
+  }
 
   const commit = useCallback((transition: (current: Workspace) => Workspace) => {
     const next = transition(workspaceRef.current);
@@ -202,13 +532,79 @@ export function ProofRailApp() {
     return next;
   }, []);
 
-  const gate = useMemo(() => verifyReleaseGate(workspace), [workspace]);
   const selectedClaim =
     workspace.claims.find((claim) => claim.id === selectedClaimId) ??
     workspace.claims[0];
-  const selectedEdges = selectedClaim
-    ? workspace.edges.filter((edge) => edge.claimId === selectedClaim.id)
-    : [];
+  const displayedReceipt = workspace.receipt ?? workspace.invalidatedReceipt;
+  const receiptModalOpen = receiptOpen && Boolean(displayedReceipt);
+  const importModalOpen = importOpen && !receiptModalOpen;
+
+  useEffect(() => {
+    if (!importModalOpen && !receiptModalOpen) return;
+
+    const dialog = receiptModalOpen
+      ? receiptDialogRef.current
+      : importDialogRef.current;
+    if (!dialog) return;
+    const activeDialog = dialog;
+
+    const activeElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    lastFocusedRef.current =
+      receiptModalOpen && (!activeElement || activeElement === document.body)
+        ? document.querySelector<HTMLElement>('[data-receipt-trigger="true"]')
+        : activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const getFocusable = () =>
+      Array.from(
+        activeDialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+    queueMicrotask(() => (getFocusable()[0] ?? activeDialog).focus());
+
+    function handleDialogKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (receiptModalOpen) setReceiptOpen(false);
+        else setImportOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        activeDialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeydown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeydown);
+      document.body.style.overflow = previousOverflow;
+      queueMicrotask(() => {
+        const returnTarget = lastFocusedRef.current?.isConnected
+          ? lastFocusedRef.current
+          : document.querySelector<HTMLElement>('[data-receipt-trigger="true"]');
+        returnTarget?.focus();
+      });
+    };
+  }, [importModalOpen, receiptModalOpen]);
 
   useEffect(() => {
     const context = document.modelContext;
@@ -226,46 +622,76 @@ export function ProofRailApp() {
         name: "get_review_context",
         title: "Read review context",
         description:
-          "Read the current ProofRail draft, atomic claims, typed evidence edges, exact revision numbers, human proposals, and deterministic release gate. This does not change the page.",
+          "Read the current ProofRail publication type, short presentation profile, exact headline and body, atomic claim locations, typed evidence edges, revision numbers, human proposals, and deterministic release gate. This does not change the page.",
         inputSchema: {
           type: "object",
           properties: {},
           additionalProperties: false,
         },
         annotations: { readOnlyHint: true, untrustedContentHint: true },
-        execute: async () => reviewContextSnapshot(workspaceRef.current),
+        execute: async () =>
+          reviewContextSnapshot(
+            workspaceRef.current,
+            previewProfileRef.current,
+          ),
       },
       {
         name: "replace_review_packet",
         title: "Load review packet",
         description:
-          "Replace the local ProofRail workspace with an arbitrary draft and exact atomic claim spans. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
+          "Replace the local ProofRail workspace with a launch page, project page, blog post, or report plus exact claim spans covering the complete headline and every complete body sentence. An optional presentationProfile supplies short layout metadata such as brand, audience, art direction, and subject without adding unchecked public prose or invented media. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
         inputSchema: {
           type: "object",
           properties: {
+            publicationType: {
+              type: "string",
+              enum: ["launch-page", "project-page", "blog-post", "report"],
+            },
             title: { type: "string", minLength: 3, maxLength: 120 },
             headline: { type: "string", minLength: 3, maxLength: 180 },
             draftText: { type: "string", minLength: 40, maxLength: 8000 },
             claims: {
               type: "array",
               minItems: 1,
-              maxItems: 12,
+              maxItems: MAX_REVIEW_PACKET_CLAIMS,
               items: {
                 type: "object",
                 properties: {
-                  text: { type: "string", minLength: 10, maxLength: 500 },
+                  location: {
+                    type: "string",
+                    enum: ["headline", "body"],
+                  },
+                  text: { type: "string", minLength: 3, maxLength: 500 },
                   risk: {
                     type: "string",
                     enum: ["low", "medium", "high"],
                   },
                 },
-                required: ["text", "risk"],
+                required: ["location", "text", "risk"],
                 additionalProperties: false,
               },
             },
             expectedWorkspaceRevision: { type: "integer", minimum: 1 },
+            presentationProfile: {
+              type: "object",
+              properties: {
+                brandName: { type: "string", minLength: 1, maxLength: 80 },
+                direction: {
+                  type: "string",
+                  enum: ["precision", "editorial", "institutional", "kinetic"],
+                },
+                industry: { type: "string", minLength: 1, maxLength: 80 },
+                audience: { type: "string", minLength: 1, maxLength: 100 },
+                author: { type: "string", minLength: 1, maxLength: 100 },
+                publishedLabel: { type: "string", minLength: 1, maxLength: 80 },
+                ctaLabel: { type: "string", minLength: 1, maxLength: 60 },
+                subjectName: { type: "string", minLength: 1, maxLength: 100 },
+              },
+              additionalProperties: false,
+            },
           },
           required: [
+            "publicationType",
             "title",
             "headline",
             "draftText",
@@ -276,13 +702,37 @@ export function ProofRailApp() {
         },
         annotations: { untrustedContentHint: true },
         execute: async (input) => {
+          const toolInput = input as unknown as ReplacePacketToolInput;
+          const packetInput: ReplacePacketInput = {
+            publicationType: toolInput.publicationType,
+            title: toolInput.title,
+            headline: toolInput.headline,
+            draftText: toolInput.draftText,
+            claims: toolInput.claims,
+            expectedWorkspaceRevision: toolInput.expectedWorkspaceRevision,
+            publicationBrief: createSourceOnlyPublicationBrief({
+              publicationType: toolInput.publicationType,
+              organization: toolInput.presentationProfile?.brandName,
+              title: toolInput.title,
+              headline: toolInput.headline,
+              body: toolInput.draftText,
+              author: toolInput.presentationProfile?.author,
+              audience: toolInput.presentationProfile?.audience,
+              publishedLabel: toolInput.presentationProfile?.publishedLabel,
+              cta: toolInput.presentationProfile?.ctaLabel,
+              inputMethod: "form",
+              sourceActor: "agent",
+            }),
+          };
           const next = commit((current) =>
-            replaceReviewPacket(
-              current,
-              input as unknown as ReplacePacketInput,
-            ),
+            replaceReviewPacket(current, packetInput),
           );
+          const nextPreviewProfile = toolPreviewProfile(toolInput);
+          previewProfileRef.current = nextPreviewProfile;
+          setPreviewProfile(nextPreviewProfile);
           setSelectedClaimId(next.claims[0].id);
+          setPreviewVariant("current");
+          setPreviewMode("public");
           setReceiptOpen(false);
           setNotice(
             "Agent loaded " +
@@ -295,6 +745,7 @@ export function ProofRailApp() {
             changed: true,
             workspaceRevision: next.revision,
             claimIds: next.claims.map((claim) => claim.id),
+            presentationProfile: nextPreviewProfile,
             gate: verifyReleaseGate(next),
           };
         },
@@ -303,7 +754,7 @@ export function ProofRailApp() {
         name: "attach_evidence",
         title: "Attach typed evidence",
         description:
-          "Add one dated source excerpt and connect it to one claim as supports, qualifies, contradicts, or outdated. This changes the live local workspace and invalidates any previous receipt.",
+          "Add one dated source excerpt and connect it to one claim as supports, qualifies, contradicts, or outdated. Public sources require a URL. Agent attachment never grants release approval; a human must still approve the linked evidence and wording. This changes the live local workspace and invalidates any previous receipt.",
         inputSchema: {
           type: "object",
           properties: {
@@ -377,7 +828,7 @@ export function ProofRailApp() {
         name: "stage_resolution_batch",
         title: "Stage claim resolutions",
         description:
-          "Stage one to eight narrow claim revisions for visible human review. This never approves or publishes a change. Each claim and the workspace must match the supplied revision numbers.",
+          "Stage one to eight narrow, single-sentence revisions inside the claim's current preview paragraph for blocked claims and visible human review. This never approves, publishes, or reopens an already releasable claim. Each claim and the workspace must match the supplied revision numbers.",
         inputSchema: {
           type: "object",
           properties: {
@@ -391,8 +842,10 @@ export function ProofRailApp() {
                   claimId: { type: "string", pattern: "^claim-[0-9]{2}$" },
                   revisedText: {
                     type: "string",
-                    minLength: 10,
+                    minLength: 3,
                     maxLength: 500,
+                    description:
+                      "One exact public sentence without a paragraph break.",
                   },
                   rationale: {
                     type: "string",
@@ -431,6 +884,7 @@ export function ProofRailApp() {
             ),
           );
           setSelectedClaimId(resolutions[0].claimId);
+          setPreviewVariant("proposed");
           setNotice(
             "Agent staged " +
               resolutions.length +
@@ -476,7 +930,7 @@ export function ProofRailApp() {
         name: "export_proof_receipt",
         title: "Create proof receipt",
         description:
-          "Create and display an immutable JSON proof receipt only when the deterministic release gate passes. The receipt includes final text, claim-evidence matrix, human audit log, and SHA-256 content hash.",
+          "Create and display an immutable JSON proof receipt only when the deterministic release gate passes. The receipt seals the publication type, headline, final body, claim locations, evidence matrix, human audit log, and SHA-256 content hash.",
         inputSchema: {
           type: "object",
           properties: {},
@@ -494,6 +948,7 @@ export function ProofRailApp() {
             }
             return storeReceipt(current, receipt);
           });
+          setImportOpen(false);
           setReceiptOpen(true);
           setNotice("Proof receipt " + receipt.receiptId + " created.");
           return {
@@ -527,20 +982,116 @@ export function ProofRailApp() {
   }, [commit]);
 
   function resetDemo() {
-    const next = createDemoWorkspace();
+    const next = createProofRailSelfDemoWorkspace();
     workspaceRef.current = next;
     setWorkspace(next);
-    setSelectedClaimId("claim-04");
+    setSelectedClaimId("claim-01");
+    setPreviewVariant("current");
+    setPreviewMode("public");
+    previewProfileRef.current = selfDemoPreviewProfile;
+    setPreviewProfile(selfDemoPreviewProfile);
     setReceiptOpen(false);
-    setNotice("Demo workspace reset to revision 7.");
+    setNotice("Verified ProofRail self-demo loaded at revision 7.");
+  }
+
+  function startNewReview() {
+    const next = createEmptyWorkspace();
+    workspaceRef.current = next;
+    setWorkspace(next);
+    setSelectedClaimId("");
+    setPreviewVariant("current");
+    setPreviewMode("public");
+    setReceiptOpen(false);
+    setNotice(null);
+  }
+
+  function inspectClaim(claimId: string) {
+    setPreviewMode("proof");
+    setSelectedClaimId(claimId);
+    requestAnimationFrame(() => {
+      const inspectionBay = document.getElementById("inspection-bay");
+      inspectionBay?.scrollIntoView({ block: "start" });
+      inspectionBay?.focus({ preventScroll: true });
+    });
+  }
+
+  async function loadHeroAsset(file?: File) {
+    if (!file) {
+      setImportHeroAsset(null);
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setImportError("Hero asset must be PNG, JPEG, or WebP.");
+      return;
+    }
+    if (file.size > MAX_HERO_ASSET_BYTES) {
+      setImportError(
+        `Hero asset must be ${Math.floor(MAX_HERO_ASSET_BYTES / 1_000_000)}.5 MB or smaller.`,
+      );
+      return;
+    }
+    try {
+      const bytes = await file.arrayBuffer();
+      const dataUrl = await readFileAsDataUrl(file);
+      const dimensions = await imageDimensions(dataUrl);
+      setImportHeroAsset({
+        fileName: file.name,
+        mediaType: file.type,
+        dataUrl,
+        ...dimensions,
+        sha256: await sha256Hex(bytes),
+      });
+      setImportError(null);
+    } catch (error) {
+      setImportHeroAsset(null);
+      setImportError(
+        error instanceof Error ? error.message : "The image could not be inspected.",
+      );
+    }
+  }
+
+  async function loadPublicationFile(file?: File) {
+    if (!file) {
+      setImportedTextFile(null);
+      return;
+    }
+    try {
+      const mediaType = publicationFileMediaType(file);
+      const bytes = await file.arrayBuffer();
+      const text = new TextDecoder().decode(bytes);
+      const extracted = extractPublicationText(text, mediaType);
+      setImportDraft(extracted);
+      setImportedTextFile({
+        fileName: file.name,
+        mediaType,
+        sha256: await sha256Hex(bytes),
+      });
+      setImportError(null);
+    } catch (error) {
+      setImportedTextFile(null);
+      setImportError(
+        error instanceof Error ? error.message : "The publication file could not be read.",
+      );
+    }
   }
 
   function stageDemoResolution(claim: ReviewClaim) {
+    if (workspaceRef.current.id !== "workspace-proofrail-self-demo") {
+      setNotice(
+        "SELF_DEMO_ONLY: no ProofRail example wording may be staged in an imported publication.",
+      );
+      return;
+    }
     const resolution = demoResolutions[claim.id];
     if (!resolution) return;
     try {
-      const next = commit((current) =>
-        stageResolutionBatch(
+      const next = commit((current) => {
+        if (current.id !== "workspace-proofrail-self-demo") {
+          throw new Error(
+            "SELF_DEMO_ONLY: imported publications cannot receive ProofRail example wording.",
+          );
+        }
+        return stageResolutionBatch(
           current,
           [
             {
@@ -551,8 +1102,9 @@ export function ProofRailApp() {
             },
           ],
           current.revision,
-        ),
-      );
+        );
+      });
+      setPreviewVariant("proposed");
       setNotice(
         "Agent proposal staged at revision " +
           next.revision +
@@ -564,59 +1116,282 @@ export function ProofRailApp() {
   }
 
   function decideSelected(decision: "approve" | "reject") {
-    if (!selectedClaim) return;
+    if (!selectedClaim?.proposal || selectedClaim.proposal.status !== "staged") return;
+    const expectedWorkspaceRevision = workspace.revision;
+    const expectedClaimRevision = selectedClaim.revision;
+    const expectedProposalId = selectedClaim.proposal.id;
     try {
       const next = commit((current) =>
-        decideProposal(current, selectedClaim.id, decision),
+        decideProposal(current, {
+          claimId: selectedClaim.id,
+          decision,
+          expectedWorkspaceRevision,
+          expectedClaimRevision,
+          expectedProposalId,
+        }),
+      );
+      setPreviewVariant(
+        next.claims.some((claim) => claim.proposal?.status === "staged")
+          ? "proposed"
+          : "current",
       );
       setNotice(
         decision === "approve"
           ? "Human approval recorded. The draft and gate were recomputed."
           : "Human rejection recorded. The blocker remains visible.",
       );
-      if (next.receipt) setReceiptOpen(true);
+      if (next.receipt) {
+        setImportOpen(false);
+        setReceiptOpen(true);
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to decide.");
     }
   }
 
-  function loadImportedPacket() {
-    const normalizedDraft = importDraft
-      .replace(/\r\n/g, "\n")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    const candidates = candidateClaimsFromDraft(normalizedDraft);
-    if (candidates.length === 0) {
-      setNotice("Add at least one complete sentence of 10 characters or more.");
-      return;
-    }
+  function approveSelectedEvidence() {
+    if (!selectedClaim) return;
+    const expectedWorkspaceRevision = workspace.revision;
+    const expectedClaimRevision = selectedClaim.revision;
     try {
-      const next = commit((current) =>
-        replaceReviewPacket(current, {
-          title: importTitle,
-          headline: importHeadline,
-          draftText: normalizedDraft,
-          claims: candidates.map((text) => ({ text, risk: "medium" as const })),
-          expectedWorkspaceRevision: current.revision,
+      commit((current) =>
+        approveClaimEvidence(current, {
+          claimId: selectedClaim.id,
+          expectedWorkspaceRevision,
+          expectedClaimRevision,
         }),
       );
+      setNotice(
+        "Human approval recorded for the linked evidence and current wording.",
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to approve evidence.");
+    }
+  }
+
+  async function loadImportedPacket() {
+    setImportError(null);
+    const expectedWorkspaceRevision = workspaceRef.current.revision;
+    let normalizedDraft: string;
+    let sourcePublicUrl: string | undefined;
+
+    try {
+      if (importSourceMode === "url") {
+        const validated = validatePublicationUrl(importSourceUrl);
+        let response: Response;
+        try {
+          response = await fetch(validated.url, {
+            headers: {
+              Accept: "text/html, text/plain, text/markdown;q=0.9",
+            },
+            credentials: "omit",
+            redirect: "follow",
+          });
+        } catch {
+          throw new Error(
+            "URL_IMPORT_BLOCKED: the source could not be fetched in this browser, usually because the site blocks cross-origin reads. Paste the HTML or upload a file instead.",
+          );
+        }
+        if (!response.ok) {
+          throw new Error(`URL_IMPORT_FAILED: source returned HTTP ${response.status}.`);
+        }
+        const mediaType =
+          response.headers.get("content-type")?.split(";", 1)[0]?.toLowerCase() ||
+          "text/html";
+        normalizedDraft = extractPublicationText(await response.text(), mediaType);
+        sourcePublicUrl = validatePublicationUrl(response.url || validated.url).url;
+      } else {
+        if (importSourceMode === "file" && !importedTextFile) {
+          throw new Error("PUBLICATION_FILE_REQUIRED: choose a TXT, Markdown, or HTML file.");
+        }
+        normalizedDraft = extractPublicationText(
+          importDraft,
+          importSourceMode === "file"
+            ? importedTextFile!.mediaType
+            : importTextMediaType,
+        );
+      }
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : "Unable to read the publication source.",
+      );
+      return;
+    }
+
+    const structuredPublication = importPublicationStructure(
+      importPublicationType,
+      importStructure,
+    );
+    let candidates: string[];
+    let reviewDraftText: string;
+    const structuredClaimTargets = new Map<string, string>();
+    try {
+      const sourceCandidates = candidateClaimsFromDraft(normalizedDraft);
+      const seenCandidates = new Set(sourceCandidates);
+      const structuredCandidates = publicationStructureClaimTargets(
+        importPublicationType,
+        structuredPublication,
+      )
+        .flatMap(({ text, targetId }) =>
+          candidateClaimsFromDraft(text).map((candidate) => ({
+            text: candidate,
+            targetId,
+          })),
+        )
+        .filter((candidate) => {
+          if (seenCandidates.has(candidate.text)) return false;
+          seenCandidates.add(candidate.text);
+          return true;
+        });
+      reviewDraftText = [
+        normalizedDraft,
+        ...structuredCandidates.map((candidate) => candidate.text),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      candidates = candidateClaimsFromDraft(reviewDraftText);
+      for (const candidate of structuredCandidates) {
+        structuredClaimTargets.set(candidate.text, candidate.targetId);
+      }
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : "Unable to inspect draft.",
+      );
+      return;
+    }
+    if (candidates.length === 0) {
+      setImportError("Add at least one complete sentence of 3 characters or more.");
+      return;
+    }
+
+    try {
+      const recordedAt = new Date().toISOString();
+      const provenanceId = `source-${importSourceMode}-r${expectedWorkspaceRevision + 1}`;
+      let publicationBrief = createSourceOnlyPublicationBrief({
+        publicationType: importPublicationType,
+        organization: importBrandName.trim() || undefined,
+        title: importTitle,
+        headline: importHeadline,
+        body: normalizedDraft,
+        author: importAuthor.trim() || undefined,
+        audience: importAudience.trim() || undefined,
+        publishedLabel: importPublishedLabel.trim() || undefined,
+        cta:
+          importPublicationType === "report"
+            ? undefined
+            : importCtaLabel.trim() || undefined,
+        recordedAt,
+        provenanceId,
+        inputMethod:
+          importSourceMode === "url"
+            ? "url-import"
+            : importTextMediaType === "text/html"
+              ? "html"
+              : "text",
+        publicUrl: sourcePublicUrl,
+        uploadedFile:
+          importSourceMode === "file" && importedTextFile
+            ? {
+                fileName: importedTextFile.fileName,
+                mediaType: importedTextFile.mediaType,
+                sha256: importedTextFile.sha256,
+              }
+            : undefined,
+        structure: structuredPublication,
+      });
+
+      if (importHeroAsset) {
+        if (!importHeroAssetAlt.trim()) {
+          throw new Error(
+            "HERO_ALT_REQUIRED: describe the uploaded image before adding it to the publication.",
+          );
+        }
+        publicationBrief = await attachUploadedHeroAsset(publicationBrief, {
+          assetId: `uploaded-hero-r${expectedWorkspaceRevision + 1}`,
+          provenanceId: `uploaded-hero-source-r${expectedWorkspaceRevision + 1}`,
+          provenanceLabel: "Human-uploaded publication hero",
+          fileName: importHeroAsset.fileName,
+          mediaType: importHeroAsset.mediaType,
+          dataUrl: importHeroAsset.dataUrl,
+          width: importHeroAsset.width,
+          height: importHeroAsset.height,
+          altText: importHeroAssetAlt.trim(),
+          sha256: importHeroAsset.sha256,
+          recordedAt,
+          rights: "customer-supplied",
+        });
+      }
+
+      const next = commit((current) =>
+          replaceReviewPacket(current, {
+          publicationType: importPublicationType,
+          title: importTitle,
+          headline: importHeadline,
+          draftText: reviewDraftText,
+          claims: [
+            {
+              location: "headline" as const,
+              text: importHeadline.trim(),
+              risk: "medium" as const,
+              previewTargetId:
+                importPublicationType === "blog-post" ? "headline" : "title",
+            },
+            ...candidates.map((text) => ({
+              location: "body" as const,
+              text,
+              risk: "medium" as const,
+              previewTargetId: structuredClaimTargets.get(text),
+            })),
+          ],
+          expectedWorkspaceRevision,
+          publicationBrief,
+        }, "human"),
+      );
       setSelectedClaimId(next.claims[0].id);
+      setPreviewVariant("current");
+      setPreviewMode("public");
+      const nextPreviewProfile: PreviewProfile = {
+        brandName: importBrandName.trim() || "Not provided",
+        direction: "precision",
+        industry: "Not provided",
+        audience: importAudience.trim() || "Not provided",
+        author: importAuthor.trim() || "Not provided",
+        publishedLabel: importPublishedLabel.trim() || "Not provided",
+        ctaLabel: importCtaLabel.trim() || "Not provided",
+        subjectName: undefined,
+        heroAssetUrl:
+          importPublicationType === "report" ? undefined : importHeroAsset?.dataUrl,
+        heroAssetAlt:
+          importPublicationType === "report"
+            ? undefined
+            : importHeroAssetAlt.trim() || undefined,
+        heroFocalPoint: "center",
+      };
+      previewProfileRef.current = nextPreviewProfile;
+      setPreviewProfile(nextPreviewProfile);
+      setImportError(null);
       setImportOpen(false);
       setReceiptOpen(false);
       setNotice(
-        "New packet loaded with " +
-          next.claims.length +
-          " unreviewed sentence candidates.",
+        `New ${importSourceMode} source loaded with ${next.claims.length} unreviewed sentence candidates.`,
       );
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const inspectionBay = document.getElementById("inspection-bay");
+          inspectionBay?.scrollIntoView({ block: "start" });
+          inspectionBay?.focus({ preventScroll: true });
+        });
+      });
     } catch (error) {
-      setNotice(
+      setImportError(
         error instanceof Error ? error.message : "Unable to load the packet.",
       );
     }
   }
 
   async function generateReceipt() {
+    if (receiptPending) return;
+    setReceiptPending(true);
     try {
       const source = workspaceRef.current;
       const receipt = await createProofReceipt(source);
@@ -628,440 +1403,93 @@ export function ProofRailApp() {
         }
         return storeReceipt(current, receipt);
       });
+      setImportOpen(false);
       setReceiptOpen(true);
       setNotice("Proof receipt " + receipt.receiptId + " created.");
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Unable to create receipt.",
       );
+    } finally {
+      setReceiptPending(false);
     }
   }
 
-  const statusText: Record<ToolStatus, string> = {
-    checking: "Registering tools",
-    registered: "6 live site tools",
-    unsupported: "WebMCP unavailable",
-    error: "Tool registration error",
-  };
-
   return (
-    <main className="proofrail-shell">
-      <header className="topbar">
-        <a className="wordmark" href="#workspace" aria-label="ProofRail home">
-          <span className="wordmark-mark" aria-hidden="true">
-            PR
-          </span>
-          <span>ProofRail</span>
-        </a>
-
-        <div className="topbar-context" aria-label="Current project">
-          <span className="eyebrow">Evidence compiler</span>
-          <span className="context-name">{workspace.title}</span>
-        </div>
-
-        <div className="top-actions">
-          <button className="quiet-action" onClick={() => setImportOpen(true)}>
-            New packet
-          </button>
-          <button className="quiet-action" onClick={resetDemo}>
-            Reset demo
-          </button>
-          <button
-            className={"session-strip tool-status-" + toolStatus}
-            onClick={() => setToolsOpen((current) => !current)}
-            aria-expanded={toolsOpen}
-          >
-            <span className="live-dot" aria-hidden="true" />
-            <span>{statusText[toolStatus]}</span>
-            <span className="session-divider" aria-hidden="true" />
-            <strong>{gate.blockers.length} blockers</strong>
-          </button>
-        </div>
-      </header>
-
-      {toolsOpen && (
-        <section className="tool-drawer" aria-label="ProofRail site tools">
-          <div className="tool-drawer-heading">
-            <div>
-              <p className="kicker">WebMCP surface</p>
-              <h2>Six tools. One authority boundary.</h2>
-            </div>
-            <button onClick={() => setToolsOpen(false)} aria-label="Close tools">
-              Close
-            </button>
-          </div>
-          <div className="tool-grid">
-            {toolManifest.map((tool, index) => (
-              <article key={tool.name}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <code>{tool.name}</code>
-                  <p>{tool.description}</p>
-                </div>
-                <em>{tool.kind}</em>
-              </article>
-            ))}
-          </div>
-          <p className="authority-note">
-            Agent boundary: inspect, connect, and stage. Only a visible human action
-            can approve claim language.
-          </p>
-        </section>
-      )}
-
-      <section className="intro" aria-labelledby="page-title">
-        <div>
-          <p className="kicker">Pre-publication evidence control</p>
-          <h1 id="page-title">
-            Make every public claim
-            <span> earn its release.</span>
-          </h1>
-        </div>
-        <div className="intro-copy">
-          <p>
-            An agent can inspect, link evidence, and stage the smallest defensible
-            revision. A human owns the final word.
-          </p>
-          <div
-            className="progress-line"
-            aria-label={
-              gate.releasableClaims +
-              " of " +
-              workspace.claims.length +
-              " claims releasable"
+    <main className="proofrail-shell" id="page-top">
+      <div
+        className="app-surface"
+        inert={importModalOpen || receiptModalOpen ? true : undefined}
+        aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
+      >
+        {workspace.claims.length === 0 ? (
+          <EmptyStudio
+            toolStatus={toolStatus}
+            onImport={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+            onLoadSelfDemo={resetDemo}
+          />
+        ) : (
+          <ReviewStudio
+            workspace={workspace}
+            selectedClaimId={selectedClaim?.id ?? ""}
+            previewVariant={previewVariant}
+            proofVisible={previewMode === "proof"}
+            toolStatus={toolStatus}
+            toolsOpen={toolsOpen}
+            toolManifest={toolManifest}
+            notice={notice}
+            receiptPending={receiptPending}
+            onImport={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+            onStartNew={startNewReview}
+            onToggleTools={() => setToolsOpen((current) => !current)}
+            onDismissNotice={() => setNotice(null)}
+            onVariantChange={setPreviewVariant}
+            onProofVisibleChange={(visible) =>
+              setPreviewMode(visible ? "proof" : "public")
             }
-          >
-            <span
-              style={{
-                width:
-                  (workspace.claims.length
-                    ? (gate.releasableClaims / workspace.claims.length) * 100
-                    : 0) + "%",
-              }}
-            />
-          </div>
-          <span className="progress-caption">
-            {gate.releasableClaims} / {workspace.claims.length} claims releasable ·
-            workspace rev. {workspace.revision}
-          </span>
-        </div>
-      </section>
+            onSelectClaim={inspectClaim}
+            onSelectSource={(_evidenceId, claimId) => inspectClaim(claimId)}
+            canStageProposal={(claim) =>
+              workspace.id === "workspace-proofrail-self-demo" &&
+              Boolean(demoResolutions[claim.id])
+            }
+            onStageProposal={stageDemoResolution}
+            onDecideProposal={decideSelected}
+            onApproveEvidence={approveSelectedEvidence}
+            onRunReleaseCheck={() => verifyReleaseGate(workspaceRef.current)}
+            onCreateReceipt={() => void generateReceipt()}
+            onOpenReceipt={() => setReceiptOpen(true)}
+            releaseReadiness={
+              <ReleaseReadiness
+                currentRevision={workspace.revision}
+                runReleaseCheck={() => verifyReleaseGate(workspaceRef.current)}
+                claims={workspace.claims}
+                evidence={workspace.evidence}
+                edges={workspace.edges}
+                onSelectClaim={inspectClaim}
+                onSelectSource={(_evidenceId, claimId) => inspectClaim(claimId)}
+              />
+            }
+          />
+        )}
+      </div>
 
-      {notice && (
-        <div className="notice" role="status">
-          <span>{notice}</span>
-          <button onClick={() => setNotice(null)} aria-label="Dismiss message">
-            ×
-          </button>
-        </div>
-      )}
-
-      <section className="workspace" id="workspace">
-        <article className="draft-panel" aria-labelledby="draft-heading">
-          <div className="panel-heading">
-            <div>
-              <span className="panel-index">A</span>
-              <p className="eyebrow">Draft under review</p>
-            </div>
-            <span className="revision-chip">rev. {workspace.revision}</span>
-          </div>
-
-          <div className="draft-copy">
-            <p className="document-label">{workspace.title}</p>
-            <h2 id="draft-heading">{workspace.headline}</h2>
-            {workspace.draftText.split(/\n\n+/).map((paragraph, index) => (
-              <p key={index}>
-                {annotatedParagraph(
-                  paragraph,
-                  workspace.claims,
-                  selectedClaimId,
-                  setSelectedClaimId,
-                ).map((part, partIndex) => (
-                  <Fragment key={partIndex}>{part}</Fragment>
-                ))}
-              </p>
-            ))}
-          </div>
-
-          <footer className="draft-footer">
-            <span>{workspace.draftText.split(/\s+/).length} words</span>
-            <span>{workspace.claims.length} atomic claims</span>
-            <span>{workspace.edges.length} evidence edges</span>
-          </footer>
-        </article>
-
-        <section className="rail-panel" aria-labelledby="rail-heading">
-          <div className="panel-heading compact">
-            <div>
-              <span className="panel-index">B</span>
-              <p className="eyebrow" id="rail-heading">
-                Claim rail
-              </p>
-            </div>
-            <span className="rail-key">Live graph</span>
-          </div>
-
-          <div className="claim-rail">
-            {workspace.claims.map((claim, index) => (
-              <button
-                key={claim.id}
-                className={
-                  "rail-node " +
-                  claim.state +
-                  (selectedClaimId === claim.id ? " active" : "")
-                }
-                onClick={() => setSelectedClaimId(claim.id)}
-                aria-pressed={selectedClaimId === claim.id}
-              >
-                <span className="node-path" aria-hidden="true">
-                  <span className="node-dot" />
-                  {index < workspace.claims.length - 1 && (
-                    <span className="node-line" />
-                  )}
-                </span>
-                <span className="node-content">
-                  <span className="node-meta">
-                    <strong>C-{claim.number}</strong>
-                    <span>
-                      {claim.proposal?.status === "staged"
-                        ? "Human decision pending"
-                        : claim.label}
-                    </span>
-                  </span>
-                  <span className="node-text">{claim.text}</span>
-                  <span className="node-link">
-                    {
-                      workspace.edges.filter((edge) => edge.claimId === claim.id)
-                        .length
-                    }{" "}
-                    evidence edge
-                    {workspace.edges.filter((edge) => edge.claimId === claim.id)
-                      .length === 1
-                      ? ""
-                      : "s"}{" "}
-                    · claim rev. {claim.revision}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <aside className="evidence-panel" aria-labelledby="evidence-heading">
-          <div className="panel-heading compact">
-            <div>
-              <span className="panel-index">C</span>
-              <p className="eyebrow" id="evidence-heading">
-                Evidence decision
-              </p>
-            </div>
-            {selectedClaim && (
-              <span className={"decision-badge " + selectedClaim.state}>
-                {selectedClaim.label}
-              </span>
-            )}
-          </div>
-
-          {selectedClaim ? (
-            <div className="decision-body">
-              <div className="claim-focus">
-                <span className="focus-id">
-                  Claim C-{selectedClaim.number} · {selectedClaim.risk} risk
-                </span>
-                <blockquote>{selectedClaim.text}</blockquote>
-              </div>
-
-              {selectedEdges.length > 0 ? (
-                selectedEdges.map((edge) => {
-                  const item = workspace.evidence.find(
-                    (record) => record.id === edge.evidenceId,
-                  );
-                  if (!item) return null;
-                  return (
-                    <article className="evidence-card" key={edge.id}>
-                      <div className="evidence-topline">
-                        <span className={"relation relation-" + edge.relation}>
-                          {relationLabel[edge.relation]}
-                        </span>
-                        <span>{item.id.toUpperCase()}</span>
-                      </div>
-                      <h3>{item.title}</h3>
-                      <p>{item.excerpt}</p>
-                      <p className="edge-rationale">{edge.rationale}</p>
-                      <footer>
-                        <span>{sourceTypeLabel[item.sourceType]}</span>
-                        <time>{item.publishedAt}</time>
-                      </footer>
-                    </article>
-                  );
-                })
-              ) : (
-                <section className="empty-evidence">
-                  <strong>No evidence edge yet</strong>
-                  <p>
-                    Ask the agent to attach a dated excerpt as support, qualifier,
-                    contradiction, or stale evidence.
-                  </p>
-                </section>
-              )}
-
-              {selectedClaim.proposal?.status === "staged" ? (
-                <section className="proposal-card is-staged">
-                  <div className="proposal-heading">
-                    <span>Agent proposal</span>
-                    <span>Human decision required</span>
-                  </div>
-                  <p>{selectedClaim.proposal.after}</p>
-                  <small>{selectedClaim.proposal.rationale}</small>
-                  <div className="human-actions">
-                    <button onClick={() => decideSelected("reject")}>
-                      Reject
-                    </button>
-                    <button
-                      className="approve"
-                      onClick={() => decideSelected("approve")}
-                    >
-                      Approve revision
-                    </button>
-                  </div>
-                </section>
-              ) : selectedClaim.proposal?.status === "approved" ? (
-                <section className="clean-card">
-                  <span className="clean-check" aria-hidden="true">
-                    ✓
-                  </span>
-                  <div>
-                    <strong>Human decision recorded</strong>
-                    <p>
-                      The approved scoped language is now in the draft and audit
-                      trail.
-                    </p>
-                  </div>
-                </section>
-              ) : selectedClaim.state === "supported" ? (
-                <section className="clean-card">
-                  <span className="clean-check" aria-hidden="true">
-                    ✓
-                  </span>
-                  <div>
-                    <strong>No language change required</strong>
-                    <p>
-                      A linked record directly supports this claim in its current
-                      scope.
-                    </p>
-                  </div>
-                </section>
-              ) : demoResolutions[selectedClaim.id] ? (
-                <section className="proposal-card">
-                  <div className="proposal-heading">
-                    <span>Safe revision available</span>
-                    <span>Not applied</span>
-                  </div>
-                  <p>{demoResolutions[selectedClaim.id].revisedText}</p>
-                  <small>{demoResolutions[selectedClaim.id].rationale}</small>
-                  <button onClick={() => stageDemoResolution(selectedClaim)}>
-                    {selectedClaim.proposal?.status === "rejected"
-                      ? "Restage agent proposal"
-                      : "Stage agent proposal"}
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </section>
-              ) : (
-                <section className="empty-evidence">
-                  <strong>Agent action required</strong>
-                  <p>
-                    The agent can attach evidence or stage a narrower claim through
-                    the page&apos;s WebMCP tools.
-                  </p>
-                </section>
-              )}
-            </div>
-          ) : (
-            <div className="decision-body">
-              <section className="empty-evidence">
-                <strong>No claim selected</strong>
-              </section>
-            </div>
-          )}
-        </aside>
-      </section>
-
-      <section className="release-band" aria-labelledby="release-title">
-        <div className="gate-signal" aria-hidden="true">
-          <span className={gate.status === "pass" ? "open" : ""} />
-        </div>
-        <div className="gate-copy">
-          <p className="eyebrow">Deterministic release gate</p>
-          <h2 id="release-title">
-            {gate.status === "pass"
-              ? "Evidence clear. Ready to seal."
-              : "Release blocked by evidence."}
-          </h2>
-        </div>
-        <div className="gate-rules">
-          <span>Claim blockers</span>
-          <strong>{gate.blockers.length}</strong>
-          <span>Human decisions open</span>
-          <strong>{gate.openHumanDecisions}</strong>
-          <span>Checked revision</span>
-          <strong>{gate.checkedRevision}</strong>
-        </div>
-        <button
-          className="receipt-button"
-          disabled={gate.status !== "pass"}
-          onClick={() => void generateReceipt()}
-        >
-          {gate.status !== "pass"
-            ? "Proof receipt locked"
-            : "Generate proof receipt"}
-          <span aria-hidden="true">↗</span>
-        </button>
-      </section>
-
-      <section className="audit-band" aria-labelledby="audit-heading">
-        <div className="audit-heading">
-          <div>
-            <span className="panel-index">D</span>
-            <div>
-              <p className="eyebrow">Immutable decision trail</p>
-              <h2 id="audit-heading">What changed, who decided, which revision.</h2>
-            </div>
-          </div>
-          <span>{workspace.audit.length} events</span>
-        </div>
-        <ol className="audit-list">
-          {workspace.audit
-            .slice()
-            .reverse()
-            .slice(0, 6)
-            .map((event) => (
-              <li key={event.id}>
-                <span className={"actor actor-" + event.actor}>{event.actor}</span>
-                <div>
-                  <strong>{event.action.replaceAll("_", " ")}</strong>
-                  <p>{event.detail}</p>
-                </div>
-                <span>rev. {event.workspaceRevision}</span>
-              </li>
-            ))}
-        </ol>
-      </section>
-
-      <footer className="site-footer">
-        <p>
-          ProofRail does not decide truth. It makes evidence gaps, revisions, and
-          human decisions explicit before publication.
-        </p>
-        <span>Local-first prototype · no account · no API key</span>
-      </footer>
-
-      {importOpen && (
+      {importModalOpen && (
         <div className="modal-backdrop" role="presentation">
           <section
+            ref={importDialogRef}
             className="import-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="import-title"
+            aria-describedby={importError ? "import-error" : undefined}
+            tabIndex={-1}
           >
             <div className="modal-heading">
               <div>
@@ -1072,37 +1500,291 @@ export function ProofRailApp() {
                 ×
               </button>
             </div>
-            <label>
-              Packet title
-              <input
-                value={importTitle}
-                maxLength={120}
-                onChange={(event) => setImportTitle(event.target.value)}
-              />
-            </label>
-            <label>
-              Headline
-              <input
-                value={importHeadline}
-                maxLength={180}
-                onChange={(event) => setImportHeadline(event.target.value)}
-              />
-            </label>
-            <label>
-              Draft text
-              <textarea
-                value={importDraft}
-                maxLength={8000}
-                rows={10}
-                onChange={(event) => setImportDraft(event.target.value)}
-              />
-            </label>
+            <section className="import-section" aria-labelledby="import-source-title">
+              <div className="import-section__head">
+                <span>01</span>
+                <div>
+                  <h3 id="import-source-title">Bring the source you are actually preparing</h3>
+                  <p>ProofRail keeps the imported bytes and provenance separate from any later proposal.</p>
+                </div>
+              </div>
+              <div className="import-source-tabs" role="group" aria-label="Publication source type">
+                {(["text", "url", "file"] as const).map((mode) => (
+                  <button
+                    type="button"
+                    key={mode}
+                    aria-pressed={importSourceMode === mode}
+                    onClick={() => {
+                      setImportSourceMode(mode);
+                      setImportError(null);
+                      if (mode !== "file") setImportedTextFile(null);
+                    }}
+                  >
+                    {mode === "text" ? "Text / HTML" : mode === "url" ? "Public or local URL" : "Document file"}
+                  </button>
+                ))}
+              </div>
+              <div className="import-grid import-source-controls">
+                {importSourceMode === "text" ? (
+                  <label>
+                    Pasted source format
+                    <select
+                      value={importTextMediaType}
+                      onChange={(event) =>
+                        setImportTextMediaType(
+                          event.target.value as "text/plain" | "text/markdown" | "text/html",
+                        )
+                      }
+                    >
+                      <option value="text/plain">Plain text</option>
+                      <option value="text/markdown">Markdown</option>
+                      <option value="text/html">HTML</option>
+                    </select>
+                  </label>
+                ) : null}
+                {importSourceMode === "url" ? (
+                  <label className="import-source-wide">
+                    Source URL
+                    <input
+                      type="url"
+                      value={importSourceUrl}
+                      placeholder="https://example.com/release-draft"
+                      onChange={(event) => setImportSourceUrl(event.target.value)}
+                    />
+                    <small>
+                      Browser-side HTTP(S) import only. If the site blocks cross-origin reads, paste its HTML or upload a file.
+                    </small>
+                  </label>
+                ) : null}
+                {importSourceMode === "file" ? (
+                  <label className="import-source-wide import-file">
+                    TXT, Markdown, or HTML document
+                    <input
+                      type="file"
+                      accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html"
+                      onChange={(event) => void loadPublicationFile(event.target.files?.[0])}
+                    />
+                    <small>
+                      {importedTextFile
+                        ? `${importedTextFile.fileName} · SHA-256 recorded`
+                        : "The file is read locally. Its exact bytes are hashed and kept in provenance."}
+                    </small>
+                  </label>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-format-title">
+              <div className="import-section__head">
+                <span>02</span>
+                <div>
+                  <h3 id="import-format-title">Choose the real publication type</h3>
+                  <p>Each type uses its own composition system. Missing source fields stay visibly missing.</p>
+                </div>
+              </div>
+              <div className="import-grid">
+                <label>
+                  Publication format
+                  <select
+                    value={importPublicationType}
+                    onChange={(event) => {
+                      const nextType = event.target.value as PublicationType;
+                      setImportPublicationType(nextType);
+                      setImportStructure(emptyImportStructure);
+                      if (nextType === "report") setImportHeroAsset(null);
+                    }}
+                  >
+                    <option value="launch-page">Product launch</option>
+                    <option value="project-page">Project / case study</option>
+                    <option value="blog-post">Editorial article</option>
+                    <option value="report">Research report</option>
+                  </select>
+                </label>
+                <label>
+                  Publishing organization
+                  <input
+                    value={importBrandName}
+                    maxLength={80}
+                    placeholder="Only the real organization"
+                    onChange={(event) => setImportBrandName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Primary audience
+                  <input
+                    value={importAudience}
+                    maxLength={100}
+                    placeholder="Who will read this publication?"
+                    onChange={(event) => setImportAudience(event.target.value)}
+                  />
+                </label>
+                <label>
+                  {authorLabels[importPublicationType]}
+                  <input
+                    value={importAuthor}
+                    maxLength={100}
+                    placeholder="Real author or responsible team"
+                    onChange={(event) => setImportAuthor(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Publication date / version
+                  <input
+                    value={importPublishedLabel}
+                    maxLength={80}
+                    placeholder="Approved date, edition, or draft label"
+                    onChange={(event) => setImportPublishedLabel(event.target.value)}
+                  />
+                </label>
+                {importPublicationType !== "report" ? (
+                  <label>
+                    Primary CTA
+                    <input
+                      value={importCtaLabel}
+                      maxLength={60}
+                      placeholder="Only when the source contains a CTA"
+                      onChange={(event) => setImportCtaLabel(event.target.value)}
+                    />
+                  </label>
+                ) : null}
+                {importPublicationType !== "report" ? (
+                  <>
+                    <label className="import-file">
+                      Supplied hero / product image (optional)
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) => void loadHeroAsset(event.target.files?.[0])}
+                      />
+                      <small>
+                        {importHeroAsset
+                          ? `${importHeroAsset.fileName} · ${importHeroAsset.width}×${importHeroAsset.height} · SHA-256 recorded`
+                          : "No stock image or fake UI is generated when media is missing."}
+                      </small>
+                    </label>
+                    <label>
+                      Image description (required with image)
+                      <input
+                        value={importHeroAssetAlt}
+                        maxLength={180}
+                        onChange={(event) => setImportHeroAssetAlt(event.target.value)}
+                        placeholder="Describe only what the supplied image shows"
+                      />
+                    </label>
+                  </>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-structure-title">
+              <div className="import-section__head">
+                <span>03</span>
+                <div>
+                  <h3 id="import-structure-title">Structure this publication</h3>
+                  <p>
+                    Fill only modules present in the source. These fields shape the
+                    selected renderer; blanks remain explicit requests for input.
+                  </p>
+                </div>
+              </div>
+              <div className="import-grid import-structure-grid">
+                {[commonStructureField, ...structureFieldsByType[importPublicationType]].map(
+                  (field) => (
+                    <label
+                      key={field.key}
+                      className={field.multiline ? "import-structure-wide" : undefined}
+                    >
+                      {field.label}
+                      {field.multiline ? (
+                        <textarea
+                          value={importStructure[field.key]}
+                          maxLength={2400}
+                          rows={4}
+                          placeholder={field.placeholder}
+                          onChange={(event) =>
+                            updateImportStructure(field.key, event.target.value)
+                          }
+                        />
+                      ) : (
+                        <input
+                          value={importStructure[field.key]}
+                          maxLength={400}
+                          placeholder={field.placeholder}
+                          onChange={(event) =>
+                            updateImportStructure(field.key, event.target.value)
+                          }
+                        />
+                      )}
+                    </label>
+                  ),
+                )}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-copy-title">
+              <div className="import-section__head">
+                <span>04</span>
+                <div>
+                  <h3 id="import-copy-title">Confirm the exact public wording</h3>
+                  <p>The headline and every complete body sentence become exact, reviewable claim spans.</p>
+                </div>
+              </div>
+              <div className="import-grid import-grid--copy">
+                <label>
+                  Internal packet title
+                  <input
+                    value={importTitle}
+                    maxLength={120}
+                    placeholder="Internal review packet title"
+                    onChange={(event) => setImportTitle(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Public headline
+                  <input
+                    value={importHeadline}
+                    maxLength={180}
+                    placeholder="Exact public headline"
+                    onChange={(event) => setImportHeadline(event.target.value)}
+                  />
+                </label>
+                {importSourceMode === "url" ? (
+                  <div className="import-copy-field import-source-message">
+                    <strong>Body copy will be extracted from the URL at import.</strong>
+                    <p>The browser removes scripts, styles, hidden containers, and markup before claim extraction.</p>
+                  </div>
+                ) : (
+                  <label className="import-copy-field">
+                    Public body copy
+                    <textarea
+                      value={importDraft}
+                      maxLength={8000}
+                      rows={9}
+                      readOnly={importSourceMode === "file"}
+                      placeholder="Paste the exact public body copy. No content is invented when a field is missing."
+                      onChange={(event) => setImportDraft(event.target.value)}
+                    />
+                    {importSourceMode === "file" ? (
+                      <small>Read-only extraction from the hashed file selected in step 01.</small>
+                    ) : null}
+                  </label>
+                )}
+              </div>
+            </section>
+            {importError && (
+              <p className="import-error" id="import-error" role="alert">
+                {importError}
+              </p>
+            )}
             <p className="import-note">
-              The manual import marks complete sentences as unreviewed candidates.
-              A WebMCP agent can instead submit deliberate atomic spans and risk
-              levels through <code>replace_review_packet</code>.
+              The public view stays clean. The proof overlay exposes exact claims,
+              evidence, staged wording and the human decision boundary. A WebMCP
+              agent can submit deliberate risk levels through
+              <code> replace_review_packet</code> but cannot approve them.
+              Put every factual statement in the public headline or body; profile
+              fields are short layout metadata, not a path around the proof gate.
             </p>
-            <button className="modal-primary" onClick={loadImportedPacket}>
+            <button className="modal-primary" onClick={() => void loadImportedPacket()}>
               Load unreviewed packet
               <span>→</span>
             </button>
@@ -1110,22 +1792,24 @@ export function ProofRailApp() {
         </div>
       )}
 
-      {receiptOpen && workspace.receipt && (
+      {receiptModalOpen && displayedReceipt && (
         <div className="modal-backdrop receipt-backdrop" role="presentation">
           <section
+            ref={receiptDialogRef}
             className="receipt-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="receipt-title"
+            tabIndex={-1}
           >
             <div className="receipt-seal">
-              <span>PASS</span>
+              <span>{workspace.receipt ? "PASS" : "VOID"}</span>
               <small>SHA-256</small>
             </div>
             <div className="modal-heading">
               <div>
                 <p className="kicker">Proof receipt</p>
-                <h2 id="receipt-title">{workspace.receipt.receiptId}</h2>
+                <h2 id="receipt-title">{displayedReceipt.receiptId}</h2>
               </div>
               <button
                 onClick={() => setReceiptOpen(false)}
@@ -1136,31 +1820,49 @@ export function ProofRailApp() {
             </div>
             <dl className="receipt-facts">
               <div>
+                <dt>Receipt state</dt>
+                <dd>{workspace.receipt ? "Current" : "Invalidated by later revision"}</dd>
+              </div>
+              <div>
+                <dt>Generated at</dt>
+                <dd>{displayedReceipt.generatedAt}</dd>
+              </div>
+              <div>
                 <dt>Sealed workspace revision</dt>
-                <dd>{workspace.receipt.sourceWorkspaceRevision}</dd>
+                <dd>{displayedReceipt.sourceWorkspaceRevision}</dd>
               </div>
               <div>
                 <dt>Claims</dt>
-                <dd>{workspace.receipt.matrix.length}</dd>
+                <dd>{displayedReceipt.matrix.length}</dd>
+              </div>
+              <div>
+                <dt>Publication</dt>
+                <dd>{displayedReceipt.publicationType.replaceAll("-", " ")}</dd>
               </div>
               <div className="hash-row">
                 <dt>Content hash</dt>
-                <dd>{workspace.receipt.contentHash}</dd>
+                <dd>{displayedReceipt.contentHash}</dd>
               </div>
             </dl>
             <div className="receipt-matrix">
-              {workspace.receipt.matrix.map((row) => (
+              {displayedReceipt.matrix.map((row) => (
                 <article key={row.claimId}>
-                  <span>{row.claimId.toUpperCase()}</span>
+                  <span>
+                    {row.claimId.toUpperCase()} · {row.claimLocation}
+                  </span>
                   <p>{row.claimText}</p>
                   <strong>{row.decision}</strong>
-                  <small>{row.evidence.length} evidence record(s)</small>
+                  {row.evidence.map((record) => (
+                    <small key={record.evidenceId}>
+                      {record.title} · {record.publishedAt} · {record.sourceType.replaceAll("-", " ")}
+                    </small>
+                  ))}
                 </article>
               ))}
             </div>
             <button
               className="modal-primary"
-              onClick={() => downloadReceipt(workspace.receipt as ProofReceipt)}
+              onClick={() => downloadReceipt(displayedReceipt)}
             >
               Download receipt JSON
               <span>↓</span>

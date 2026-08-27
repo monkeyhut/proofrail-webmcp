@@ -1,0 +1,95 @@
+.canvas {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(241, 237, 227, 0.22);
+  background: #090909;
+  color: #f1ede3;
+  container-type: inline-size;
+}
+
+.canvasBar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  border-bottom: 1px solid rgba(241, 237, 227, 0.18);
+  padding: 12px 16px;
+  background: #090909;
+  color: #f1ede3;
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+}
+
+.canvasMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 18px;
+  color: #8f8c84;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.viewportStage {
+  width: 100%;
+  min-height: 640px;
+  overflow: auto;
+  padding: clamp(10px, 2.4vw, 28px);
+  background: #151515;
+  scrollbar-color: #6c6963 #151515;
+}
+
+.viewport {
+  width: 100%;
+  min-height: 760px;
+  margin-inline: auto;
+  overflow: hidden;
+  background: #f1ede3;
+  color: #0a0a09;
+  container-type: inline-size;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+}
+
+.canvas[data-viewport="desktop"] .viewport {
+  max-width: 1440px;
+}
+
+.canvas[data-viewport="tablet"] .viewport {
+  max-width: 820px;
+}
+
+.canvas[data-viewport="mobile"] .viewport {
+  max-width: 390px;
+}
+
+@container (max-width: 620px) {
+  .canvasBar {
+    display: grid;
+  }
+
+  .canvasMeta {
+    justify-content: flex-start;
+  }
+
+  .viewportStage {
+    min-height: 520px;
+    padding: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas *,
+  .canvas *::before,
+  .canvas *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

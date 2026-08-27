@@ -1,0 +1,828 @@
+.root {
+  --ink: #080807;
+  --ink-soft: #151513;
+  --paper: #f0ece2;
+  --paper-deep: #ddd7ca;
+  --muted: #5e5a53;
+  --line: rgba(8, 8, 7, 0.18);
+  --line-on-ink: rgba(240, 236, 226, 0.19);
+  --signal: #ff5b3d;
+  --signal-text: #a52d18;
+  --blue: #3157ff;
+  --pass: #b7d1ad;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.root button,
+.root a {
+  font: inherit;
+}
+
+.root button:focus-visible,
+.root a:focus-visible,
+.root [tabindex="-1"]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--paper);
+}
+
+.topbar {
+  position: sticky;
+  z-index: 60;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.36fr) minmax(320px, 1fr) auto;
+  min-height: 66px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(240, 236, 226, 0.97);
+}
+
+.wordmark {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  gap: 11px;
+  border-right: 1px solid var(--line);
+  padding: 0 22px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.wordmark > span {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  background: var(--signal);
+  color: var(--ink);
+  font: 900 0.63rem/1 "Courier New", monospace;
+}
+
+.wordmark strong {
+  font-size: 1.12rem;
+  letter-spacing: -0.045em;
+}
+
+.workspaceIdentity {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 20px;
+}
+
+.workspaceIdentity span,
+.workspaceIdentity small,
+.definition > p,
+.toolManifest header span,
+.gateCard header span,
+.claimIndex header span,
+.inspector header > span,
+.evidenceStack > span,
+.proposal > span,
+.humanAction > span,
+.receiptCard > span,
+.ledger header span {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.workspaceIdentity span,
+.workspaceIdentity small {
+  color: var(--muted);
+}
+
+.workspaceIdentity strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topActions {
+  display: flex;
+  align-items: stretch;
+}
+
+.topActions > button {
+  min-height: 66px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 0 16px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topActions > button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.topActions .toolsButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 18px;
+}
+
+.toolsButton i {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+
+.toolsButton[data-status="registered"] i { background: #4c8a65; }
+.toolsButton[data-status="error"] i { background: var(--signal); }
+
+.toolsButton b {
+  display: grid;
+  min-width: 23px;
+  height: 23px;
+  place-items: center;
+  border: 1px solid currentColor;
+}
+
+.toolManifest {
+  position: relative;
+  z-index: 50;
+  border-bottom: 1px solid var(--line-on-ink);
+  padding: clamp(24px, 3vw, 42px);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.toolManifest > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+
+.toolManifest header span { color: var(--signal); }
+
+.toolManifest h2 {
+  max-width: 25ch;
+  margin: 8px 0 0;
+  font-size: clamp(1.7rem, 3.2vw, 3.4rem);
+  letter-spacing: -0.06em;
+  line-height: 0.96;
+}
+
+.toolManifest header button {
+  min-height: 44px;
+  border: 1px solid var(--line-on-ink);
+  padding: 0 16px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.toolManifest ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line-on-ink);
+  border-left: 1px solid var(--line-on-ink);
+  list-style: none;
+}
+
+.toolManifest li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 132px;
+  border-right: 1px solid var(--line-on-ink);
+  border-bottom: 1px solid var(--line-on-ink);
+  padding: 16px;
+}
+
+.toolManifest li > span,
+.toolManifest li > em {
+  color: #98938a;
+  font: 800 0.62rem/1.2 "Courier New", monospace;
+}
+
+.toolManifest li code {
+  font-size: 0.71rem;
+  font-weight: 800;
+}
+
+.toolManifest li p {
+  margin: 12px 0 0;
+  color: #aaa59d;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.toolManifest li > em {
+  grid-column: 2;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.definition {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.24fr) minmax(420px, 0.9fr) minmax(360px, 0.7fr);
+  align-items: center;
+  gap: clamp(20px, 3vw, 54px);
+  min-height: 126px;
+  border-bottom: 1px solid var(--line);
+  padding: 20px clamp(18px, 2.5vw, 38px);
+}
+
+.definition > p {
+  margin: 0;
+  color: var(--signal-text);
+}
+
+.definition h1 {
+  max-width: 34ch;
+  margin: 0;
+  font-size: clamp(1.25rem, 2.1vw, 2.45rem);
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.definition > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 10px;
+  font: 800 0.59rem/1.2 "Courier New", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.definition > div span,
+.definition > div strong {
+  border: 1px solid var(--line);
+  padding: 9px 10px;
+}
+
+.definition > div strong {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+
+.definition > div i { color: var(--muted); font-style: normal; }
+
+.notice {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding-left: clamp(18px, 2.5vw, 38px);
+  background: var(--blue);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.notice button {
+  align-self: stretch;
+  min-width: 48px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.studio {
+  display: grid;
+  grid-template-columns: minmax(0, 72fr) minmax(350px, 28fr);
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-soft);
+}
+
+.canvasColumn {
+  min-width: 0;
+  border-right: 1px solid var(--line-on-ink);
+}
+
+.canvasToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 92px;
+  border-bottom: 1px solid var(--line-on-ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.authorityTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.authorityTabs > button {
+  display: grid;
+  min-width: 0;
+  min-height: 92px;
+  align-content: center;
+  gap: 6px;
+  border: 0;
+  border-right: 1px solid var(--line-on-ink);
+  padding: 14px 17px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.authorityTabs > button[aria-pressed="true"] {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.authorityTabs > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.authorityTabs span {
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authorityTabs small {
+  color: #918d84;
+  font: 700 0.57rem/1.3 "Courier New", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.authorityTabs > button[aria-pressed="true"] small { color: var(--muted); }
+
+.viewTools {
+  display: flex;
+  align-items: stretch;
+}
+
+.viewTools > div {
+  display: flex;
+}
+
+.viewTools button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-left: 1px solid var(--line-on-ink);
+  padding: 0 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.59rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.viewTools button[aria-pressed="true"] { background: var(--signal); color: var(--ink); }
+.viewTools button:hover { background: var(--paper); color: var(--ink); }
+
+.canvasWrap {
+  min-height: 720px;
+  padding: clamp(12px, 1.7vw, 24px);
+  background: #1a1a18;
+}
+
+.reviewRail {
+  position: sticky;
+  top: 66px;
+  max-height: calc(100vh - 66px);
+  overflow: auto;
+  background: var(--paper);
+  color: var(--ink);
+  scrollbar-color: var(--muted) var(--paper-deep);
+}
+
+.gateCard,
+.claimIndex,
+.inspector,
+.receiptCard {
+  border-bottom: 1px solid var(--line);
+}
+
+.gateCard { padding: 20px; }
+
+.gateCard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.gateCard header div { display: grid; gap: 6px; }
+.gateCard header span { color: var(--muted); }
+.gateCard header strong { font-size: 1.4rem; letter-spacing: -0.05em; }
+.gateCard[data-status="blocked"] header strong { color: #c93b25; }
+
+.gateCard header b {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: var(--signal);
+  font-size: 1.2rem;
+}
+
+.gateCard[data-status="pass"] header b { background: var(--pass); }
+
+.gateCard dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 20px 0 16px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.gateCard dl > div {
+  display: grid;
+  gap: 12px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 10px;
+}
+
+.gateCard dt { color: var(--muted); font-size: 0.61rem; text-transform: uppercase; }
+.gateCard dd { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.06em; }
+
+.gateCard > button,
+.humanAction button,
+.proposal button,
+.receiptCard button {
+  min-height: 48px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  font-size: 0.67rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gateCard > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: var(--signal);
+  color: var(--ink);
+}
+
+.gateCard > button:hover,
+.humanAction button:hover,
+.receiptCard button:hover:not(:disabled) { background: var(--blue); color: white; }
+
+.quickResult {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  border-left: 4px solid var(--signal);
+  padding: 12px 13px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.quickResult strong { font-size: 1rem; }
+.quickResult p { margin: 0; color: #b4afa7; font-size: 0.75rem; line-height: 1.45; }
+.quickResult small { color: var(--signal); font: 700 0.58rem/1.3 "Courier New", monospace; text-transform: uppercase; }
+
+.claimIndex > header,
+.ledger > header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 20px;
+}
+
+.claimIndex ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claimIndex li { border-bottom: 1px solid var(--line); }
+.claimIndex li:last-child { border-bottom: 0; }
+
+.claimIndex button {
+  display: grid;
+  width: 100%;
+  min-height: 74px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 4px 12px;
+  border: 0;
+  padding: 12px 20px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.claimIndex button:hover,
+.claimIndex button[aria-pressed="true"] { background: var(--paper-deep); }
+
+.claimIndex button > span {
+  grid-row: 1 / span 2;
+  color: var(--signal-text);
+  font: 800 0.63rem/1.35 "Courier New", monospace;
+}
+
+.claimIndex button strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.claimIndex button small {
+  color: var(--muted);
+  font-size: 0.61rem;
+  text-transform: uppercase;
+}
+
+.inspector { padding: 20px; }
+
+.inspector > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inspector header em {
+  border: 1px solid currentColor;
+  padding: 6px 8px;
+  color: #bb3b29;
+  font: 800 0.58rem/1 "Courier New", monospace;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.inspector header em[data-state="clear"] { color: #46734d; }
+
+.inspector > blockquote {
+  margin: 18px 0 10px;
+  font-size: 1.1rem;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.blockerReason {
+  margin: 0 0 18px;
+  color: #9d3829;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.evidenceStack { display: grid; gap: 8px; }
+.evidenceStack > span { color: var(--muted); }
+
+.evidenceStack > button,
+.missingEvidence {
+  display: grid;
+  gap: 7px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  padding: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.evidenceStack > button { cursor: pointer; }
+.evidenceStack > button:hover { border-color: var(--blue); background: white; }
+.evidenceStack > button strong,
+.missingEvidence strong { font-size: 0.74rem; }
+.evidenceStack > button p,
+.missingEvidence p { margin: 0; color: #57534d; font-size: 0.72rem; line-height: 1.45; }
+.evidenceStack > button small { color: var(--blue); font: 700 0.57rem/1.35 "Courier New", monospace; text-transform: uppercase; }
+
+.proposal,
+.humanAction,
+.pendingAction,
+.clearedAction {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+
+.proposal { border-color: var(--blue); }
+.proposal > span,
+.humanAction > span,
+.pendingAction > span { color: var(--blue); }
+.proposal > p,
+.humanAction > p,
+.pendingAction > p,
+.clearedAction p { margin: 0; font-size: 0.75rem; line-height: 1.45; }
+.proposal > small { color: var(--muted); font-size: 0.68rem; line-height: 1.4; }
+.proposal > div { display: grid; grid-template-columns: 0.72fr 1.28fr; gap: 8px; }
+.proposal button { min-height: 44px; padding: 0 10px; }
+.proposal button:last-child { background: var(--blue); }
+.proposal button:hover { background: var(--signal); color: var(--ink); }
+.humanAction button { width: 100%; padding-inline: 12px; }
+
+.clearedAction { grid-template-columns: 32px 1fr; align-items: center; border-color: #668a68; }
+.clearedAction > span { display: grid; width: 30px; height: 30px; place-items: center; background: var(--pass); }
+
+.receiptCard {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.receiptCard > span { color: var(--muted); }
+.receiptCard > strong { font-size: 1rem; letter-spacing: -0.03em; }
+.receiptCard > p { margin: 0; color: var(--muted); font-size: 0.72rem; line-height: 1.45; }
+.receiptCard > small { overflow-wrap: anywhere; color: var(--blue); font-family: "Courier New", monospace; }
+.receiptCard button { width: 100%; margin-top: 5px; }
+.receiptCard button:disabled { cursor: not-allowed; opacity: 0.42; }
+
+.releaseSection {
+  padding: clamp(24px, 4vw, 68px);
+  background: var(--paper-deep);
+}
+
+.ledger {
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.ledger > header { min-height: 64px; padding-inline: clamp(18px, 3vw, 44px); }
+
+.ledger ol {
+  margin: 0;
+  padding: 0 clamp(18px, 3vw, 44px) clamp(28px, 4vw, 56px);
+  list-style: none;
+}
+
+.ledger li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.ledger li > span,
+.ledger li > em {
+  color: var(--muted);
+  font: 800 0.62rem/1.35 "Courier New", monospace;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.ledger li strong { font-size: 0.72rem; text-transform: uppercase; }
+.ledger li p { margin: 5px 0 0; color: var(--muted); font-size: 0.72rem; line-height: 1.45; }
+
+.footer {
+  display: flex;
+  min-height: 130px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  padding: clamp(28px, 4vw, 58px);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.footer strong { max-width: 24ch; font-size: clamp(1.5rem, 2.6vw, 3rem); letter-spacing: -0.06em; line-height: 0.98; }
+.footer span { color: #99958c; font: 700 0.62rem/1.45 "Courier New", monospace; text-transform: uppercase; }
+
+.expandedCanvas {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: auto;
+  padding: 0 18px 28px;
+  background: #121210;
+  color: var(--paper);
+}
+
+.expandedCanvas > header {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line-on-ink);
+  background: #121210;
+}
+
+.expandedCanvas > header div { display: grid; gap: 4px; }
+.expandedCanvas > header span { color: var(--signal); font: 800 0.6rem/1.2 "Courier New", monospace; text-transform: uppercase; }
+.expandedCanvas > header strong { font-size: 0.85rem; }
+.expandedCanvas > header button { min-height: 44px; border: 1px solid var(--line-on-ink); padding: 0 16px; background: var(--paper); color: var(--ink); cursor: pointer; }
+
+@media (max-width: 1180px) {
+  .topbar { grid-template-columns: 180px 1fr auto; }
+  .toolsButton span { display: none; }
+  .definition { grid-template-columns: 150px 1fr; }
+  .definition > div { grid-column: 1 / -1; justify-content: flex-start; }
+  .studio { grid-template-columns: minmax(0, 1fr) 340px; }
+  .canvasToolbar { grid-template-columns: 1fr; }
+  .viewTools { border-top: 1px solid var(--line-on-ink); }
+  .viewTools > button:last-child { margin-left: auto; }
+}
+
+@media (max-width: 900px) {
+  .topbar { position: relative; grid-template-columns: 1fr auto; }
+  .workspaceIdentity { grid-column: 1 / -1; grid-row: 2; border-top: 1px solid var(--line); }
+  .definition { grid-template-columns: 1fr; }
+  .definition > div { grid-column: auto; justify-content: flex-start; }
+  .studio { display: flex; flex-direction: column; }
+  .canvasColumn { border-right: 0; }
+  .reviewRail { position: static; order: 1; max-height: none; }
+  .canvasColumn { order: 2; }
+  .canvasWrap { min-height: 560px; }
+  .toolManifest ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .wordmark { border-right: 0; padding-inline: 12px; }
+  .wordmark strong { display: none; }
+  .topActions > button {
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 0.57rem;
+  }
+  .topActions .toolsButton { gap: 4px; padding-inline: 8px; }
+  .workspaceIdentity { grid-template-columns: 1fr auto; padding-inline: 14px; }
+  .workspaceIdentity > span { grid-column: 1 / -1; }
+  .definition { min-height: 0; padding: 22px 14px; }
+  .definition h1 { font-size: 1.55rem; }
+  .definition > div { display: grid; grid-template-columns: 1fr; align-items: stretch; }
+  .definition > div i { display: none; }
+  .definition > div span,
+  .definition > div strong { min-height: 44px; display: flex; align-items: center; }
+  .toolManifest { padding: 22px 14px; }
+  .toolManifest > header { display: grid; }
+  .toolManifest ol { grid-template-columns: 1fr; }
+  .authorityTabs { grid-template-columns: 1fr; }
+  .authorityTabs > button { min-height: 58px; }
+  .viewTools { display: grid; grid-template-columns: 1fr 1fr; }
+  .viewTools > div { grid-column: 1 / -1; }
+  .viewTools > div button { flex: 1; }
+  .viewTools > button:last-child { margin-left: 0; }
+  .canvasWrap { min-height: 470px; padding: 8px; }
+  .gateCard,
+  .inspector,
+  .receiptCard { padding: 16px 14px; }
+  .claimIndex > header { padding-inline: 14px; }
+  .claimIndex button { padding-inline: 14px; }
+  .releaseSection { padding: 18px 10px; }
+  .ledger > header { align-items: flex-start; flex-direction: column; justify-content: center; padding-block: 14px; }
+  .ledger ol { padding-inline: 14px; }
+  .ledger li { grid-template-columns: 46px 1fr; }
+  .ledger li > em { grid-column: 2; }
+  .footer { align-items: flex-start; flex-direction: column; padding: 32px 16px; }
+  .expandedCanvas { padding-inline: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

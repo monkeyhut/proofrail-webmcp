@@ -2,29 +2,30 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ProofRail — CI for public claims",
+  metadataBase: new URL("https://proofrail-webmcp.kingacht.chatgpt.site"),
+  title: "ProofRail — See the page. Prove every claim.",
   description:
-    "Turn draft claims and source packets into reviewable evidence decisions and a verifiable proof receipt.",
+    "The pre-publication review room for marketing and PR: preview the real page, connect factual claims to evidence, and keep release locked until a human approves.",
   openGraph: {
-    title: "ProofRail — CI for public claims",
+    title: "ProofRail — See the page. Prove every claim.",
     description:
-      "The agent assembles the evidence. The human decides what may ship.",
+      "Preview the real publication, prove every factual claim, and keep release locked until a human approves the exact wording.",
     type: "website",
     images: [
       {
-        url: "/proofrail-social.png",
+        url: "/og-proofrail-v4.png",
         width: 1200,
         height: 630,
-        alt: "An editorial evidence graph with source cards, a proof rail, and a blocked contradiction.",
+        alt: "ProofRail publication canvas with an evidence rail stopping at a human-operated release gate.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ProofRail — CI for public claims",
+    title: "ProofRail — See the page. Prove every claim.",
     description:
-      "The agent assembles the evidence. The human decides what may ship.",
-    images: ["/proofrail-social.png"],
+      "Preview the real publication, prove every factual claim, and keep release locked until a human approves the exact wording.",
+    images: ["/og-proofrail-v4.png"],
   },
 };
 

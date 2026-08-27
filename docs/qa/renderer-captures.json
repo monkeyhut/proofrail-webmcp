@@ -1,0 +1,85 @@
+{
+  "status": "pass",
+  "baseUrl": "http://127.0.0.1:4183",
+  "generatedAt": "2026-08-27T23:12:57.243Z",
+  "renderers": [
+    "launch",
+    "case-study",
+    "article",
+    "report"
+  ],
+  "results": [
+    {
+      "renderer": "launch",
+      "viewport": "1280x800",
+      "file": "docs/submission-assets/renderers/proofrail-launch-desktop.png",
+      "bytes": 61673,
+      "sha256": "ED0C94025CE12C01BBDED0C5DB9A0524E9E76D192EBA716179F196BFDE3EFBE4",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "launch",
+      "viewport": "390x844",
+      "file": "docs/submission-assets/renderers/proofrail-launch-mobile.png",
+      "bytes": 45349,
+      "sha256": "3A75A6616480AB96C33C29FBA209AD17D0AC41B362B2D52E8F533B4133656443",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "case-study",
+      "viewport": "1280x800",
+      "file": "docs/submission-assets/renderers/proofrail-case-study-desktop.png",
+      "bytes": 74831,
+      "sha256": "23F05637EC0CA5CBA98EBCA76AE2D639A57055C2A80EBB0891B49369ACA6399E",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "case-study",
+      "viewport": "390x844",
+      "file": "docs/submission-assets/renderers/proofrail-case-study-mobile.png",
+      "bytes": 53988,
+      "sha256": "7DB95C2C4AFEBD2D97AD2D59DB3AE1FF632E235378F5E15F7139EAFBB83CE892",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "article",
+      "viewport": "1280x800",
+      "file": "docs/submission-assets/renderers/proofrail-article-desktop.png",
+      "bytes": 82310,
+      "sha256": "E54EB3CE53AEDCEFDC44FFA02CC1B365A9EB68E817D839D2449D4EAD94F781E1",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "article",
+      "viewport": "390x844",
+      "file": "docs/submission-assets/renderers/proofrail-article-mobile.png",
+      "bytes": 60216,
+      "sha256": "2FE1C6097449F3851A8ADB4FC28CF2FF637B53E617E21204BE0E5ADACB674E77",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "report",
+      "viewport": "1280x800",
+      "file": "docs/submission-assets/renderers/proofrail-report-desktop.png",
+      "bytes": 64648,
+      "sha256": "297918D95BA913CD0347BF2EF3B60DA490F91AF0DEA999ED81232BBA803DBFFE",
+      "overflow": false,
+      "consoleErrors": 0
+    },
+    {
+      "renderer": "report",
+      "viewport": "390x844",
+      "file": "docs/submission-assets/renderers/proofrail-report-mobile.png",
+      "bytes": 43994,
+      "sha256": "019EDB2FF3EA9CFA46D5B0133BD13ED921C989BDE8FC0B2C73EDC60C0C029E75",
+      "overflow": false,
+      "consoleErrors": 0
+    }
+  ]
+}

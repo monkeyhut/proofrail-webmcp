@@ -1,0 +1,257 @@
+.missing {
+  display: grid;
+  min-height: 112px;
+  align-content: center;
+  gap: 7px;
+  border: 1px dashed currentColor;
+  padding: 16px;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.missing > span,
+.missing > strong {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.missing > strong {
+  color: currentColor;
+}
+
+.missing > p {
+  max-width: 58ch;
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.48;
+}
+
+.proofTarget {
+  position: relative;
+  min-width: 0;
+}
+
+.proofTargetSelected {
+  outline: 3px solid var(--publication-accent, #ff5b3d);
+  outline-offset: -3px;
+}
+
+.proofMarkers {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.proofMarkers button,
+.proofMarkers > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--publication-foreground, #111);
+  border-radius: 0;
+  background: var(--publication-background, #fff);
+  color: var(--publication-foreground, #111);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.proofMarkers button {
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.proofMarkers button:hover,
+.proofMarkerSelected {
+  border-color: var(--publication-accent, #ff5b3d) !important;
+  background: var(--publication-accent, #ff5b3d) !important;
+  color: #090909 !important;
+}
+
+.proofMarkers button:focus-visible,
+.media a:focus-visible,
+.media summary:focus-visible {
+  outline: 3px solid var(--publication-accent, #ff5b3d);
+  outline-offset: 2px;
+}
+
+.media {
+  width: 100%;
+  margin: 0;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.media > img,
+.media > video {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.media figcaption {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  padding: 10px 12px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.media figcaption small {
+  opacity: 0.58;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+}
+
+.interactiveMedia {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(190px, 0.6fr);
+  min-height: 260px;
+}
+
+.interactiveMedia > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.interactiveMedia > div:last-child,
+.documentMedia {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+.interactiveMedia p,
+.documentMedia span {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.interactiveMedia a,
+.documentMedia a {
+  width: fit-content;
+  min-height: 44px;
+  padding: 13px 0 0;
+  color: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mediaProvenance {
+  border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  font-size: 0.65rem;
+}
+
+.mediaProvenance summary {
+  min-height: 44px;
+  padding: 14px 12px;
+  cursor: pointer;
+  font-family: "Courier New", Courier, monospace;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mediaProvenance ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 1px 0 0;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  list-style: none;
+}
+
+.mediaProvenance li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--publication-background, #fff);
+}
+
+.mediaProvenance li span {
+  opacity: 0.62;
+  font-family: "Courier New", Courier, monospace;
+  text-transform: uppercase;
+}
+
+.authority {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.authority > span {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid currentColor;
+}
+
+.authority[data-authority="proposal"] > span {
+  border-color: #ff5b3d;
+  background: #ff5b3d;
+}
+
+.authority[data-authority="release-candidate"] > span {
+  border-color: #9cc393;
+  background: #9cc393;
+}
+
+.authority > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.authority strong,
+.authority small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authority strong {
+  font-size: 0.72rem;
+}
+
+.authority small {
+  opacity: 0.62;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@container (max-width: 560px) {
+  .interactiveMedia {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proofTarget,
+  .proofMarkers *,
+  .media * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
