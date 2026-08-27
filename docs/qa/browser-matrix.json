@@ -1,7 +1,7 @@
 {
   "status": "pass",
-  "baseUrl": "http://127.0.0.1:4176",
-  "generatedAt": "2026-08-27T22:18:37.533Z",
+  "baseUrl": "http://127.0.0.1:4183",
+  "generatedAt": "2026-08-27T23:12:34.010Z",
   "engines": [
     "chromium",
     "firefox",

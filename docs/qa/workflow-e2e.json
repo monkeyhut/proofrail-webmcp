@@ -1,12 +1,12 @@
 {
   "status": "pass",
-  "baseUrl": "http://127.0.0.1:4176",
-  "generatedAt": "2026-08-27T22:18:45.778Z",
+  "baseUrl": "http://127.0.0.1:4183",
+  "generatedAt": "2026-08-27T23:12:42.199Z",
   "reducedMotion": "reduce",
   "gateFeedbackMs": {
-    "initialBlocked": 29.9,
-    "humanApproved": 34,
-    "receiptInvalidated": 36
+    "initialBlocked": 41,
+    "humanApproved": 35.5,
+    "receiptInvalidated": 40.1
   },
   "assertions": [
     "initial-release-blocked",
@@ -16,6 +16,7 @@
     "separate-content-bound-receipt",
     "receipt-dialog-focus-return",
     "source-replacement-removes-self-demo",
+    "seventy-five-html-sentences-imported-exactly",
     "later-revision-invalidates-receipt",
     "later-revision-blocks-release-again",
     "console-errors-zero"

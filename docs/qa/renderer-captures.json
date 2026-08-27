@@ -1,7 +1,7 @@
 {
   "status": "pass",
-  "baseUrl": "http://127.0.0.1:4176",
-  "generatedAt": "2026-08-27T22:18:58.240Z",
+  "baseUrl": "http://127.0.0.1:4183",
+  "generatedAt": "2026-08-27T23:12:57.243Z",
   "renderers": [
     "launch",
     "case-study",
@@ -13,8 +13,8 @@
       "renderer": "launch",
       "viewport": "1280x800",
       "file": "docs/submission-assets/renderers/proofrail-launch-desktop.png",
-      "bytes": 60303,
-      "sha256": "18B0A255AC24B1D45247BC77CC830E82D6203AE44A18C2DAEA094A8AE858A32B",
+      "bytes": 61673,
+      "sha256": "ED0C94025CE12C01BBDED0C5DB9A0524E9E76D192EBA716179F196BFDE3EFBE4",
       "overflow": false,
       "consoleErrors": 0
     },

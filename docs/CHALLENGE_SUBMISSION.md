@@ -80,8 +80,8 @@ This is a recording plan, not evidence that a final video exists.
 
 | Time | Picture | Narration intent |
 | --- | --- | --- |
-| 0:00–0:15 | Fresh empty state, product explanation, import action, and locked gate in the first viewport | Identify the user, input, output, differentiator, and first action without a demo customer |
-| 0:15–0:30 | Load the clearly labelled ProofRail self-demo | Explain that the optional demo uses only ProofRail's repository-authored material |
+| 0:00–0:18 | Fresh empty workspace beside the clearly labelled, read-only ProofRail example; click page → claim/source → human gate | Identify the user, input, finished output, evidence trace, protected human boundary, and first action without a demo customer |
+| 0:18–0:30 | Open that verified example in the workspace | Explain that the optional demo uses only ProofRail's repository-authored material and never writes state from the first-view preview |
 | 0:30–0:50 | Show the publication canvas and switch among launch, case study, article, and report | Demonstrate four structurally different publication compositions and honest missing-field modules |
 | 0:50–1:10 | Open the six WebMCP tools and call `get_review_context` | Show that the agent reads exact live state rather than pixels |
 | 1:10–1:30 | Select a factual sentence and open its linked source passage | Trace sentence → claim → evidence → support or conflict |
@@ -127,8 +127,9 @@ the receipt is a state-bound artifact.
 
 The product shell is an editorial review tool, not a marketing showreel. The
 public canvas changes composition for launch, case study, article, and report.
-Motion is reserved for real focus and state transitions. No cinematic video or
-3D runtime is used because neither earned a product role. The only retained
+The first-view sequence animates only causal product state: finished page →
+selected claim and source → protected human gate. No cinematic video or 3D
+runtime is used because neither earned a product role. The only retained
 generated medium is a reviewed social card documented in
 `docs/ASSET_PROVENANCE.md`.
 

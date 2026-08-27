@@ -4,16 +4,16 @@ Final read-only reviews recorded 2026-08-28 against the local Publication
 Compiler rebuild. Each reviewer scored the same seven-category rubric
 independently. The release score is the lowest total, not an average.
 
-| Category | Minimum | Design reviewer | Safety reviewer | Product reviewer |
+| Category | Minimum | Visual reviewer | UX reviewer | System reviewer |
 | --- | ---: | ---: | ---: | ---: |
 | Immediate comprehension | 13/15 | 15 | 15 | 15 |
-| Preview quality and adaptivity | 22/25 | 24 | 23 | 23 |
+| Preview quality and adaptivity | 22/25 | 23 | 23 | 24 |
 | Interaction and state honesty | 18/20 | 20 | 20 | 20 |
 | Art direction / anti-AI | 13/15 | 14 | 14 | 14 |
-| Purposeful media | 8/10 | 9 | 9 | 8 |
+| Purposeful media | 8/10 | 8 | 8 | 9 |
 | Responsive / accessibility / performance | 9/10 | 9 | 9 | 9 |
 | WebMCP / safety / challenge fit | 5/5 | 5 | 5 | 5 |
-| **Total** | **90/100** | **96** | **95** | **94** |
+| **Total** | **90/100** | **94** | **94** | **96** |
 
 Result: **PASS — lowest independent total 94/100; every category minimum met;
 no reviewer observed a kill criterion.**
@@ -22,7 +22,8 @@ Shared evidence inspected by the reviewers included the separate renderer
 implementations, exact-six WebMCP boundary, deterministic revision and receipt
 tests, real desktop/mobile captures, 24/24 browser matrix, zero axe
 critical/serious findings, zero console errors, and loaded-state Lighthouse at
-98/100/100/100 with LCP 2.160 seconds.
+98/100/100/100 with LCP 2.101 seconds. The reduced-motion E2E imported 75 HTML
+body sentences exactly and measured visible gate feedback at 35.5–41.0 ms.
 
 The five-second test passed independently: the empty experience identifies the
 marketing/PR user, pre-publication moment, accepted input, finished-preview and

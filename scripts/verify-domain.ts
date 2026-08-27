@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  MAX_REVIEW_BODY_CANDIDATES,
   approveClaimEvidence,
   attachEvidence,
   buildPublicationPreview,
@@ -14,6 +15,7 @@ import {
   storeReceipt,
   verifyReleaseGate,
 } from "../lib/proofrail.ts";
+import { extractPublicationText } from "../lib/publication-import.ts";
 import { extractPublicationMetric } from "../lib/publication-metrics.ts";
 
 function decideCurrent(
@@ -470,22 +472,63 @@ const shortSentenceWorkspace = replaceReviewPacket(createDemoWorkspace(), {
   expectedWorkspaceRevision: 7,
 });
 assert.equal(shortSentenceWorkspace.claims[1].text, "Free.");
-assert.throws(
-  () =>
-    candidateClaimsFromDraft(
-      Array.from(
-        { length: 49 },
-        (_, index) => `Body sentence ${index + 1} contains enough reviewable text.`,
-      ).join(" "),
-    ),
-  /TOO_MANY_CANDIDATES/,
+const longImportSentences = Array.from(
+  { length: 75 },
+  (_, index) => `Body sentence ${index + 1} contains enough reviewable text.`,
+);
+const longImportDraft = extractPublicationText(
+  `<main>${longImportSentences.map((sentence) => `<p>${sentence}</p>`).join("")}</main>`,
+  "text/html",
+);
+assert.equal(longImportDraft, longImportSentences.join("\n\n"));
+const longImportCandidates = candidateClaimsFromDraft(longImportDraft);
+assert.deepEqual(longImportCandidates, longImportSentences);
+
+const longImportWorkspace = replaceReviewPacket(createDemoWorkspace(), {
+  publicationType: "blog-post",
+  title: "Long publication import",
+  headline: "Every imported sentence remains inside the human review gate.",
+  draftText: longImportDraft,
+  claims: [
+    {
+      location: "headline",
+      text: "Every imported sentence remains inside the human review gate.",
+      risk: "medium",
+    },
+    ...longImportCandidates.map((text) => ({
+      location: "body" as const,
+      text,
+      risk: "medium" as const,
+    })),
+  ],
+  expectedWorkspaceRevision: 7,
+});
+assert.equal(longImportWorkspace.draftText, longImportDraft);
+assert.deepEqual(
+  longImportWorkspace.claims.slice(1).map((claim) => claim.text),
+  longImportSentences,
+);
+assert.equal(longImportWorkspace.claims.length, 76);
+const longImportGate = verifyReleaseGate(longImportWorkspace);
+assert.equal(longImportGate.status, "blocked");
+assert.equal(longImportGate.blockers.length, 76);
+assert.ok(longImportGate.blockers.every((blocker) => blocker.code === "UNREVIEWED"));
+assert.equal(longImportGate.releasableClaims, 0);
+await assert.rejects(
+  () => createProofReceipt(longImportWorkspace),
+  /RELEASE_BLOCKED/,
 );
 
 const oversizedDraft = Array.from(
-  { length: 49 },
-  (_, index) => `Documented release sentence number ${index + 1} has a complete review scope.`,
-).join(" ");
-assert.throws(() => candidateClaimsFromDraft(oversizedDraft), /TOO_MANY_CANDIDATES/);
+  { length: MAX_REVIEW_BODY_CANDIDATES + 1 },
+  (_, index) => `Documented sentence ${index + 1} stays atomic and independently reviewable.`,
+).join("\n\n");
+assert.throws(
+  () => candidateClaimsFromDraft(oversizedDraft),
+  new RegExp(
+    `TOO_MANY_CANDIDATES: found ${MAX_REVIEW_BODY_CANDIDATES + 1};.*at most ${MAX_REVIEW_BODY_CANDIDATES}.*no source sentence was truncated or merged`,
+  ),
+);
 assert.throws(
   () => candidateClaimsFromDraft(`A normal review sentence. ${"x".repeat(500)}.`),
   /CLAIM_TOO_LONG/,

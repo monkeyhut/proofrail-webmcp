@@ -44,6 +44,7 @@ async function pageDiagnostics(page) {
     const undersizedTargets = Array.from(
       document.querySelectorAll("button, a, input, textarea, select, summary"),
     )
+      .filter((element) => !element.closest("[inert]"))
       .filter(visible)
       .map((element) => {
         const rect = element.getBoundingClientRect();
@@ -93,12 +94,16 @@ for (const [engineName, engine] of Object.entries(engines)) {
       page.on("pageerror", (error) => consoleErrors.push(error.message));
 
       await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
-      await page.locator("main h1").filter({ hasText: "See the page." }).waitFor();
+      await page.locator("main h1").filter({ hasText: "Preview the page." }).waitFor();
       const emptyText = await page.locator("main").innerText();
-      assert.match(emptyText, /For marketing \+ PR/i);
+      assert.match(emptyText, /Marketing \+ PR/i);
       assert.match(emptyText, /Import the publication you are preparing/i);
-      assert.match(emptyText, /finished launch, case study, article, or report/i);
-      assert.match(emptyText, /Only the visible human review can clear a release/i);
+      assert.match(emptyText, /Import a launch, case study, article or report/i);
+      assert.match(emptyText, /Your workspace is empty\. This example is read-only/i);
+      assert.match(emptyText, /ProofRail keeps public claims locked until a human approves the final wording/i);
+      assert.match(emptyText, /Release blocked/i);
+      assert.match(emptyText, /Release stays human/i);
+      assert.match(emptyText, /blocks release until a person approves/i);
       assert.doesNotMatch(
         emptyText,
         /northstar|northern|arbor|trusted by 800|acme/i,

@@ -111,7 +111,10 @@ export function LaunchRenderer({ brief, proofOverlay }: LaunchRendererProps) {
       lang={brief.accessibilityMetadata.language}
       dir={brief.accessibilityMetadata.readingDirection}
     >
-      <header className={styles.hero}>
+      <header
+        className={styles.hero}
+        data-product-visual={productMediaId ? "provided" : "missing"}
+      >
         <div className={styles.heroCopy}>
           <ProofTarget targetId="organization" proofOverlay={proofOverlay}>
             {brief.organization.status === "provided" ? (

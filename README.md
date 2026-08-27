@@ -28,10 +28,12 @@ source material
 → immutable receipt
 ```
 
-A fresh visit begins in an honest empty state. The primary action imports the
-publication being prepared. The optional **ProofRail self-demo** uses only
-ProofRail's own repository-authored product contract and is always identified
-as a self-demo.
+A fresh visit keeps the workspace honestly empty while showing a clearly
+labelled, read-only **ProofRail self-demo preview** beside the primary import
+action. That example uses the real launch renderer and repository-authored
+ProofRail material. Its manual page → claim/source → human-gate sequence never
+changes workspace state or simulates approval. Opening the self-demo is a
+separate explicit action.
 
 ## Three authority states
 
@@ -138,10 +140,11 @@ The 2026-08-28 local production run recorded:
   16 px; initial focus, Escape, and focus return passed.
 - Reduced-motion E2E: blocked gate → two visible human decisions → ready →
   separate receipt → source mutation → invalidated receipt → blocked again.
-  Visible gate feedback measured 29.9–36.0 ms in that local run.
+  The same run imported 75 HTML body sentences as 75 exact claims without
+  truncation or merging. Visible gate feedback measured 35.5–41.0 ms.
 - Lighthouse on the loaded `/qa/self-demo` experience: Performance 98,
-  Accessibility 100, Best Practices 100, SEO 100; LCP 2.160 s, CLS 0,
-  TBT 0 ms, and 185 KiB transferred.
+  Accessibility 100, Best Practices 100, SEO 100; LCP 2.101 s, CLS 0,
+  TBT 0 ms, and 186 KiB transferred.
 
 The machine-readable reports live in [`docs/qa`](docs/qa). Lighthouse does not
 provide a field INP value for this local navigation run; TBT and the explicit
@@ -149,11 +152,13 @@ interaction timings are recorded without presenting them as field INP.
 
 ## Media decision
 
-The working product uses no cinematic video or 3D runtime. ImageGen, Higgsfield,
-and Meshy were evaluated against a strict test: a medium must explain the live
-claim-to-source-to-human-to-release state faster than the interface itself.
-Only a reviewed ImageGen social card is retained; video and 3D were not used
-because they added no justified product value. See
+The working product uses a cinematic, DOM-native motion sequence for real
+orientation and state changes: publication page → selected sentence → linked
+source → protected human gate. It uses no cinematic video or 3D runtime.
+ImageGen, Higgsfield, and Meshy were evaluated against a strict test: a medium
+must explain that live relationship faster than the interface itself. Only a
+reviewed ImageGen social card is retained; video and 3D were not used because
+they added no justified product value. See
 [the asset manifest](docs/ASSET_PROVENANCE.md).
 
 ## Honest limits

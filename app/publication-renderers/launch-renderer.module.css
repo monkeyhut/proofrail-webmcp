@@ -114,6 +114,23 @@
   color: var(--publication-background, #f1ede3);
 }
 
+.hero[data-product-visual="missing"] {
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+
+.hero[data-product-visual="missing"] .heroCopy {
+  min-height: 720px;
+  border-right: 0;
+}
+
+.hero[data-product-visual="missing"] .heroProduct {
+  grid-template-columns: minmax(170px, 0.32fr) minmax(0, 1fr);
+  min-height: 180px;
+  align-items: center;
+  border-top: 1px solid var(--launch-border);
+}
+
 .heroProduct > p {
   margin: 0;
   color: var(--publication-accent, #ff5b3d);
@@ -391,6 +408,11 @@
   .heroCopy {
     min-height: 620px;
     padding: 28px 18px;
+  }
+
+  .hero[data-product-visual="missing"] .heroProduct {
+    grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .hero h1 {

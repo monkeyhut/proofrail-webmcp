@@ -22,6 +22,12 @@ export type PublicationType =
   | "launch-page"
   | "report";
 
+// Keep imported publications bounded, but large enough for a substantive article or
+// report. Every accepted body sentence remains its own exact, gated claim; callers
+// must never make an oversized packet fit by truncating or merging source text.
+export const MAX_REVIEW_BODY_CANDIDATES = 96;
+export const MAX_REVIEW_PACKET_CLAIMS = MAX_REVIEW_BODY_CANDIDATES + 1;
+
 export type ResolutionProposal = {
   id: string;
   before: string;
@@ -924,7 +930,10 @@ export function replaceReviewPacket(
   if (draftText.length < 40 || draftText.length > 8000) {
     throw new Error("INVALID_DRAFT_LENGTH");
   }
-  if (input.claims.length < 1 || input.claims.length > 49) {
+  if (
+    input.claims.length < 1 ||
+    input.claims.length > MAX_REVIEW_PACKET_CLAIMS
+  ) {
     throw new Error("INVALID_CLAIM_COUNT");
   }
 
@@ -1243,9 +1252,9 @@ export function candidateClaimsFromDraft(draftText: string): string[] {
     );
   }
   const candidates = sentences.filter((sentence) => sentence.length >= 3);
-  if (candidates.length > 48) {
+  if (candidates.length > MAX_REVIEW_BODY_CANDIDATES) {
     throw new Error(
-      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 48 body sentences plus its headline.`,
+      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most ${MAX_REVIEW_BODY_CANDIDATES} body sentences plus its headline. Import a smaller publication or split it into separately reviewed releases; no source sentence was truncated or merged.`,
     );
   }
   return candidates;

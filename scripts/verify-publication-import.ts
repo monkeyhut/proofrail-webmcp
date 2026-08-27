@@ -40,6 +40,15 @@ assert.doesNotMatch(
   extractedHtml,
   /script|style|noscript|hidden attribute|aria-hidden|css-hidden/i,
 );
+const longHtmlSentences = Array.from(
+  { length: 75 },
+  (_, index) => `Imported paragraph ${index + 1} remains exact and reviewable.`,
+);
+const extractedLongHtml = extractPublicationText(
+  `<main>${longHtmlSentences.map((sentence) => `<p>${sentence}</p>`).join("")}</main>`,
+  "text/html",
+);
+assert.equal(extractedLongHtml, longHtmlSentences.join("\n\n"));
 assert.equal(
   extractPublicationText(
     "  First   paragraph. \r\n\r\n\r\n Second\tparagraph.  ",

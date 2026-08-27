@@ -33,7 +33,7 @@ const criteria: Criterion[] = [
     points: 15,
     pass:
       firstView.includes("marketing + pr") &&
-      firstView.includes("before anything becomes public"),
+      firstView.includes("before publication"),
     evidence: "The first screen names marketing/PR and the pre-publication moment.",
   },
   {

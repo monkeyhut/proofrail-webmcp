@@ -11,7 +11,7 @@ again immediately before submission.
 | Criterion | ProofRail implementation contract | Verification state |
 | --- | --- | --- |
 | WebMCP leverage | Six page-owned tools operate on the same live publication, claim, evidence, proposal, revision, gate, and receipt state shown to the human. No tool has human approval or publishing authority. | Local six-tool contract, stale-revision, authority, domain, and workflow checks pass; public WebMCP discovery remains open |
-| Execution | Honest empty-first import, provenance-aware `PublicationBrief`, four structurally distinct renderers, visible authority states, deterministic release readiness, and a separate receipt action. | Local verify, reduced-motion E2E, 24-case browser matrix, axe, and representative Lighthouse pass |
+| Execution | Honest empty-first import with a read-only real-renderer example, provenance-aware `PublicationBrief`, four structurally distinct renderers, visible authority states, deterministic release readiness, and a separate receipt action. | Local verify, 75-sentence HTML import E2E, reduced-motion workflow, 24-case browser matrix, axe, and representative Lighthouse pass |
 | Potential impact | Marketing and PR teams can review launch pages, case studies, articles, and reports before release while retaining human control over the final wording. | Product proposition; user-validation evidence not claimed |
 | Creativity and ambition | ProofRail treats factual publication work as a compiler pipeline: source, typed brief, rendered candidate, evidence checks, protected human decision, deterministic gate, and content-bound receipt. | Product contract implemented; three independent gauntlet reviews pass locally, lowest score 94/100 |
 
@@ -19,11 +19,11 @@ again immediately before submission.
 
 | Requirement | Expected evidence | Gate |
 | --- | --- | --- |
-| Fresh visit is honest | Empty workspace; no customer, campaign, adoption metric, testimonial, or KPI appears | PASS — desktop/mobile captures and kill scan |
+| Fresh visit is honest | Empty workspace plus a clearly labelled, read-only ProofRail-owned example; no customer, campaign, adoption metric, testimonial, or KPI appears | PASS — desktop/mobile captures, inert preview actions, and kill scan |
 | Product is understandable | Input, output, audience, differentiator, first action, and human boundary visible in the first viewport | PASS — all three independent reviewers passed the five-second test |
 | Four real renderers | Launch, case study, article, and report use different DOM composition, hierarchy, media logic, and mobile rhythm | PASS — separate TSX/CSS compositions and type-specific import/domain tests; final submission may still add per-renderer captures |
 | Missing values stay missing | Intentional missing modules request input and never invent public copy or metrics | PASS — brief/import/domain tests |
-| Release check is real | CTA calls deterministic domain logic, reports concrete blockers, and focuses the first blocker | PASS — browser E2E measured 29.9–36.0 ms across blocked, human-cleared, and invalidated paths |
+| Release check is real | CTA calls deterministic domain logic, reports concrete blockers, and focuses the first blocker | PASS — browser E2E measured 35.5–41.0 ms across blocked, human-cleared, and invalidated paths |
 | Human boundary is protected | Agent can inspect, attach evidence, stage proposals, explain blockers, run the gate, and export a passing receipt; it cannot approve or publish | PASS — exact-six WebMCP and authority contract tests |
 | Revision conflicts fail loudly | Stale workspace, claim, proposal, and source revisions do not overwrite current state | PASS — domain and WebMCP contract tests |
 | Receipt is state-bound | Exact publication, claims, evidence, human decisions, revision, timestamp, and hash are bound; mutation invalidates readiness and the prior receipt | PASS — domain tests plus reduced-motion browser E2E |
@@ -56,8 +56,8 @@ Current local evidence status:
    mobile reading floor; automated Tab/Shift-Tab wrap is not separately logged.
 6. PASS — Chromium, Firefox, and WebKit at all eight viewports (24/24).
 7. PASS — full E2E with reduced motion enabled.
-8. PASS WITH LIMIT — Lighthouse 98/100/100/100, LCP 2.160 s, CLS 0,
-   TBT 0 ms, 185 KiB; a field INP value is unavailable locally.
+8. PASS WITH LIMIT — Lighthouse 98/100/100/100, LCP 2.101 s, CLS 0,
+   TBT 0 ms, 186 KiB; a field INP value is unavailable locally.
 9. PASS — rejected-language, retired-media, and secret heuristics returned no
    matches in the stated runtime paths.
 10. PASS — three independent reviewers scored 96, 95, and 94; lowest 94/100,

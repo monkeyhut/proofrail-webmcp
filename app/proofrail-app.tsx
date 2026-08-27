@@ -5,6 +5,7 @@ import {
   approveClaimEvidence,
   attachEvidence,
   candidateClaimsFromDraft,
+  MAX_REVIEW_PACKET_CLAIMS,
   createEmptyWorkspace,
   createProofRailSelfDemoWorkspace,
   createProofReceipt,
@@ -652,7 +653,7 @@ export function ProofRailApp({ initialDemo = false }: { initialDemo?: boolean })
             claims: {
               type: "array",
               minItems: 1,
-              maxItems: 12,
+              maxItems: MAX_REVIEW_PACKET_CLAIMS,
               items: {
                 type: "object",
                 properties: {

@@ -1,16 +1,18 @@
 # ProofRail local QA record
 
 Recorded 2026-08-28 against the local precompressed production build at
-`http://127.0.0.1:4176`. This is build evidence for the current branch, not a
+`http://127.0.0.1:4183`. This is build evidence for the current branch, not a
 claim that a public deployment or Devpost submission exists.
 
 ## Commands
 
 ```bash
 npm run verify
-npm run start -- --host 127.0.0.1 --port 4176
+npm run start -- --port 4183
+$env:PROOFRAIL_BASE_URL="http://127.0.0.1:4183"
 npm run qa:browsers
 npm run qa:workflow
+$env:PROOFRAIL_LIGHTHOUSE_URL="http://127.0.0.1:4183/qa/self-demo"
 npm run qa:lighthouse
 npm audit --audit-level=high
 ```
@@ -27,10 +29,11 @@ npm audit --audit-level=high
 | Mobile reading floor | PASS | 320×568 import labels/fields ≥16 px |
 | Full release workflow | PASS | `workflow-e2e.json` |
 | Four renderer captures | PASS — desktop/mobile for each type | `renderer-captures.json` |
-| Visible gate response | 29.9–36.0 ms | Blocked, human-cleared, and invalidated paths |
+| Long HTML import | PASS — 75/75 exact body claims plus headline | `workflow-e2e.json` and domain/import tests |
+| Visible gate response | 35.5–41.0 ms | Blocked, human-cleared, and invalidated paths |
 | Lighthouse | 98 / 100 / 100 / 100 | `lighthouse-self-demo.json` |
-| LCP / CLS / TBT | 2.160 s / 0 / 0 ms | Loaded `/qa/self-demo`, mobile emulation |
-| Initial transfer | 185 KiB | Brotli-precompressed production assets |
+| LCP / CLS / TBT | 2.101 s / 0 / 0 ms | Loaded `/qa/self-demo`, mobile emulation |
+| Initial transfer | 186 KiB | Brotli-precompressed production assets |
 
 Required matrix viewports: 1920×1080, 1440×1000, 1280×800,
 1024×768, 768×1024, 390×844, 360×800, and 320×568.
@@ -44,6 +47,9 @@ examples.
 - `/qa/self-demo` is an explicitly labelled, repository-backed ProofRail
   self-demo used so Lighthouse and automation do not score an artificially
   empty page.
+- `/` keeps the real workspace empty but includes a read-only preview of that
+  self-demo. Its page, claim/source, and human-gate stages are manual and never
+  create approval or release state.
 - The browser E2E runs with `prefers-reduced-motion: reduce` and demonstrates
   functional parity without motion dependence.
 - Lighthouse does not produce a field INP value for this local navigation.

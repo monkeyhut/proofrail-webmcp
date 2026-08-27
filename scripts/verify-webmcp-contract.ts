@@ -335,6 +335,17 @@ const toolByName = new Map(
   registeredTools.map((tool) => [toolName(tool), tool] as const),
 );
 
+invariant(
+  sources.app.text.includes("maxItems: MAX_REVIEW_PACKET_CLAIMS"),
+  "replace_review_packet must expose the same bounded long-publication claim limit as the domain.",
+);
+invariant(
+  sources.domain.text.includes(
+    "export const MAX_REVIEW_PACKET_CLAIMS = MAX_REVIEW_BODY_CANDIDATES + 1",
+  ),
+  "The WebMCP packet limit must remain derived from the fail-loudly body-candidate limit.",
+);
+
 for (const [name, tool] of toolByName) {
   const schemaProperty = getObjectProperty(tool, "inputSchema");
   invariant(schemaProperty, `${name} must declare an explicit inputSchema.`);

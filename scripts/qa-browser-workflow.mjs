@@ -66,21 +66,33 @@ try {
   await importDialog.waitFor();
   await page.getByLabel("Publishing organization").fill("ProofRail QA");
   await page.getByLabel("Primary audience").fill("Marketing teams");
+  await page.getByLabel("Pasted source format").selectOption("text/html");
   await page.getByLabel("Internal packet title").fill("Replacement packet");
   await page
     .getByLabel("Public headline")
     .fill("A revised publication requires a fresh review.");
+  const importedHtmlSentences = Array.from(
+    { length: 75 },
+    (_, index) =>
+      `Imported HTML sentence ${String(index + 1).padStart(2, "0")} remains exact and reviewable.`,
+  );
   await page
     .getByLabel("Public body copy")
-    .fill(
-      "The source changed after the previous receipt. Every statement requires a new evidence and human review pass.",
-    );
+    .fill(`<main>${importedHtmlSentences.map((sentence) => `<p>${sentence}</p>`).join("")}</main>`);
   await page.getByRole("button", { name: "Load unreviewed packet" }).click();
   await importDialog.waitFor({ state: "hidden" });
 
   const replacedText = await page.locator("main").innerText();
   assert.match(replacedText, /Receipt invalidated by a later revision/i);
   assert.match(replacedText, /A revised publication requires a fresh review\./i);
+  assert.match(replacedText, /Imported HTML sentence 01 remains exact and reviewable\./i);
+  assert.match(replacedText, /Imported HTML sentence 75 remains exact and reviewable\./i);
+  assert.doesNotMatch(replacedText, /TOO_MANY_CANDIDATES|<p>/i);
+  assert.equal(
+    await page.getByRole("button", { name: /^C-[0-9]{2} / }).count(),
+    76,
+    "75 imported HTML body sentences plus the headline did not remain exact claims",
+  );
   assert.doesNotMatch(replacedText, /ProofRail self-demo/i);
 
   const invalidatedGateStart = performance.now();
@@ -111,6 +123,7 @@ try {
       "separate-content-bound-receipt",
       "receipt-dialog-focus-return",
       "source-replacement-removes-self-demo",
+      "seventy-five-html-sentences-imported-exactly",
       "later-revision-invalidates-receipt",
       "later-revision-blocks-release-again",
       "console-errors-zero",
