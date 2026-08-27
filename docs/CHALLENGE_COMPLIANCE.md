@@ -10,8 +10,8 @@ this working checklist.
 | Criterion | ProofRail evidence |
 | --- | --- |
 | WebMCP Leverage | Six narrow page-owned tools cover live draft inspection, evidence attachment, revision-locked proposals, gate verification, and receipt export. Human approval is deliberately not exposed as a tool. |
-| Execution | The working UI shows the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, mobile, and browser checks are repeatable. |
-| Potential Impact | Marketing and PR teams get a concrete release control for factual claims in websites, launch pages, and reports. |
+| Execution | The working UI shows the complete publication in a live simulated layout, plus the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, mobile, and browser checks are repeatable. |
+| Potential Impact | Marketing and PR teams can preview and control factual claims in project pages, blog posts, launch pages, and reports before those words reach the public. |
 | Creativity & Ambition | ProofRail applies CI concepts—tests, patches, protected review, and build receipts—to public language without pretending that an agent is a truth oracle. |
 
 ## Required deliverables

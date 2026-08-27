@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ProofRail — Pre-publication claim gate for marketing & PR",
   description:
-    "Check claims in a company website, launch page, or report against evidence before publishing.",
+    "Preview and check claims in a project page, blog post, launch page, or report against evidence before publishing.",
   openGraph: {
     title: "ProofRail — Pre-publication claim gate for marketing & PR",
     description:

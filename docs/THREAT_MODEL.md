@@ -25,9 +25,27 @@ JSON Schemas cap strings and arrays, use enums for relationships and source
 types, reject extra properties, and require exact claim identifiers. Domain
 validation repeats material checks before changing state.
 
-Imported packets must represent every complete sentence as an exact claim span.
-More than twelve candidates, a sentence longer than 500 characters, an unknown
-claim ID, or an ambiguous repeated span fails before state changes.
+Imported packets must represent the complete headline as one exact headline
+claim and every complete body sentence as an exact body claim. More than eleven
+body sentences plus the headline, a sentence longer than 500 characters, an
+unknown claim ID, or an ambiguous repeated span fails before state changes.
+Extra partial claims, duplicate sentence text, overlapping spans, unknown risk,
+source-type, or relationship enums, and staged rewrites containing multiple
+sentences also fail in the domain layer rather than relying only on JSON Schema.
+
+### Preview output cannot execute publisher content
+
+The publication preview renders the packet as React text nodes inside one of
+four fixed presentation templates. It does not render arbitrary HTML, embed a
+publisher URL, execute scripts, invent a CTA, or claim CMS pixel parity.
+
+The proposed preview is a derived copy: staged agent wording never mutates the
+canonical headline or body. Every staged span must map exactly once and staged
+spans may not overlap. The complete projected headline/body claim map is then
+validated again. If any mapping fails, ProofRail refuses the entire proposal
+projection and shows the unchanged draft with a visible error instead of
+displaying a partial or misleading mix. The internal packet title is kept out of
+the simulated public canvas, so it cannot bypass claim review as masthead copy.
 
 ### Sources are not fetched
 
@@ -41,12 +59,13 @@ remains untrusted until a human approves the linked evidence and current wording
 
 ### Receipts prove integrity, not truth
 
-The receipt contains the final text; source type, date, URL, excerpt, edge
-rationale, and relationship; the current packet's audit segment; source
-workspace revision; and a SHA-256 hash over that content. This detects a changed
-payload without leaking audit titles from an earlier replaced packet. It does
-not authenticate the author, certify a source, or replace legal or editorial
-review.
+The receipt contains the publication type, preview template version, headline,
+final body; source type, date, URL, excerpt, edge rationale, and relationship;
+the current packet's audit segment; source workspace revision; and a SHA-256
+hash over that content. This detects a changed payload without leaking audit
+titles from an earlier replaced packet. It does not authenticate the author,
+certify a source, guarantee a publisher's final CMS layout, or replace legal or
+editorial review.
 
 ## Data handling
 

@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  Fragment,
   lazy,
   Suspense,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -26,12 +24,15 @@ import {
   verifyReleaseGate,
   type AttachEvidenceInput,
   type EvidenceRelation,
+  type PublicationPreviewVariant,
+  type PublicationType,
   type ProofReceipt,
   type ReplacePacketInput,
   type ReviewClaim,
   type StageResolutionInput,
   type Workspace,
 } from "../lib/proofrail";
+import { PublicationPreview } from "./publication-preview";
 
 const ProofArtifact = lazy(async () => {
   const artifactModule = await import("./proof-artifact");
@@ -232,6 +233,7 @@ function reviewContextSnapshot(workspace: Workspace) {
   return {
     workspace: {
       id: workspace.id,
+      publicationType: workspace.publicationType,
       title: workspace.title,
       headline: workspace.headline,
       draftText: workspace.draftText,
@@ -240,6 +242,7 @@ function reviewContextSnapshot(workspace: Workspace) {
     claims: workspace.claims.map((claim) => ({
       id: claim.id,
       text: claim.text,
+      location: claim.location,
       state: claim.state,
       risk: claim.risk,
       revision: claim.revision,
@@ -263,51 +266,6 @@ function reviewContextSnapshot(workspace: Workspace) {
         }
       : null,
   };
-}
-
-function annotatedParagraph(
-  paragraph: string,
-  claims: ReviewClaim[],
-  selectedClaimId: string,
-  onSelect: (claimId: string) => void,
-): ReactNode[] {
-  const matches = claims
-    .map((claim) => ({
-      claim,
-      start: paragraph.indexOf(claim.text),
-    }))
-    .filter((match) => match.start >= 0)
-    .sort((a, b) => a.start - b.start);
-
-  if (matches.length === 0) return [paragraph];
-
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  for (const match of matches) {
-    if (match.start < cursor) continue;
-    if (match.start > cursor) {
-      parts.push(paragraph.slice(cursor, match.start));
-    }
-    parts.push(
-      <button
-        key={match.claim.id}
-        className={
-          "claim-inline status-" +
-          match.claim.state +
-          (selectedClaimId === match.claim.id ? " selected" : "")
-        }
-        onClick={() => onSelect(match.claim.id)}
-        aria-pressed={selectedClaimId === match.claim.id}
-        aria-controls="inspection-bay"
-      >
-        {match.claim.text}
-        <span>{match.claim.number}</span>
-      </button>,
-    );
-    cursor = match.start + match.claim.text.length;
-  }
-  if (cursor < paragraph.length) parts.push(paragraph.slice(cursor));
-  return parts;
 }
 
 function downloadReceipt(receipt: ProofReceipt) {
@@ -344,9 +302,13 @@ export function ProofRailApp() {
   const [importHeadline, setImportHeadline] = useState(
     "A draft waiting for evidence.",
   );
+  const [importPublicationType, setImportPublicationType] =
+    useState<PublicationType>("project-page");
   const [importDraft, setImportDraft] = useState(
     "Paste a short draft here. ProofRail will turn complete sentences into claim candidates for evidence review.",
   );
+  const [previewVariant, setPreviewVariant] =
+    useState<PublicationPreviewVariant>("current");
 
   const commit = useCallback((transition: (current: Workspace) => Workspace) => {
     const next = transition(workspaceRef.current);
@@ -454,7 +416,7 @@ export function ProofRailApp() {
         name: "get_review_context",
         title: "Read review context",
         description:
-          "Read the current ProofRail draft, atomic claims, typed evidence edges, exact revision numbers, human proposals, and deterministic release gate. This does not change the page.",
+          "Read the current ProofRail publication type, exact headline and body, atomic claim locations, typed evidence edges, revision numbers, human proposals, and deterministic release gate. This does not change the page.",
         inputSchema: {
           type: "object",
           properties: {},
@@ -467,10 +429,14 @@ export function ProofRailApp() {
         name: "replace_review_packet",
         title: "Load review packet",
         description:
-          "Replace the local ProofRail workspace with an arbitrary draft and exact claim spans covering every complete sentence. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
+          "Replace the local ProofRail workspace with a project page, blog post, launch page, or report plus exact claim spans covering the complete headline and every complete body sentence. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
         inputSchema: {
           type: "object",
           properties: {
+            publicationType: {
+              type: "string",
+              enum: ["project-page", "blog-post", "launch-page", "report"],
+            },
             title: { type: "string", minLength: 3, maxLength: 120 },
             headline: { type: "string", minLength: 3, maxLength: 180 },
             draftText: { type: "string", minLength: 40, maxLength: 8000 },
@@ -481,19 +447,24 @@ export function ProofRailApp() {
               items: {
                 type: "object",
                 properties: {
-                  text: { type: "string", minLength: 10, maxLength: 500 },
+                  location: {
+                    type: "string",
+                    enum: ["headline", "body"],
+                  },
+                  text: { type: "string", minLength: 3, maxLength: 500 },
                   risk: {
                     type: "string",
                     enum: ["low", "medium", "high"],
                   },
                 },
-                required: ["text", "risk"],
+                required: ["location", "text", "risk"],
                 additionalProperties: false,
               },
             },
             expectedWorkspaceRevision: { type: "integer", minimum: 1 },
           },
           required: [
+            "publicationType",
             "title",
             "headline",
             "draftText",
@@ -511,6 +482,7 @@ export function ProofRailApp() {
             ),
           );
           setSelectedClaimId(next.claims[0].id);
+          setPreviewVariant("current");
           setReceiptOpen(false);
           setNotice(
             "Agent loaded " +
@@ -605,7 +577,7 @@ export function ProofRailApp() {
         name: "stage_resolution_batch",
         title: "Stage claim resolutions",
         description:
-          "Stage one to eight narrow claim revisions for visible human review. This never approves or publishes a change. Each claim and the workspace must match the supplied revision numbers.",
+          "Stage one to eight narrow, single-sentence revisions for blocked claims and visible human review. This never approves, publishes, or reopens an already releasable claim. Each claim and the workspace must match the supplied revision numbers.",
         inputSchema: {
           type: "object",
           properties: {
@@ -619,7 +591,7 @@ export function ProofRailApp() {
                   claimId: { type: "string", pattern: "^claim-[0-9]{2}$" },
                   revisedText: {
                     type: "string",
-                    minLength: 10,
+                    minLength: 3,
                     maxLength: 500,
                   },
                   rationale: {
@@ -659,6 +631,7 @@ export function ProofRailApp() {
             ),
           );
           setSelectedClaimId(resolutions[0].claimId);
+          setPreviewVariant("proposed");
           setNotice(
             "Agent staged " +
               resolutions.length +
@@ -704,7 +677,7 @@ export function ProofRailApp() {
         name: "export_proof_receipt",
         title: "Create proof receipt",
         description:
-          "Create and display an immutable JSON proof receipt only when the deterministic release gate passes. The receipt includes final text, claim-evidence matrix, human audit log, and SHA-256 content hash.",
+          "Create and display an immutable JSON proof receipt only when the deterministic release gate passes. The receipt seals the publication type, headline, final body, claim locations, evidence matrix, human audit log, and SHA-256 content hash.",
         inputSchema: {
           type: "object",
           properties: {},
@@ -760,6 +733,7 @@ export function ProofRailApp() {
     workspaceRef.current = next;
     setWorkspace(next);
     setSelectedClaimId("claim-04");
+    setPreviewVariant("current");
     setReceiptOpen(false);
     setNotice("Demo workspace reset to revision 7.");
   }
@@ -791,6 +765,7 @@ export function ProofRailApp() {
           current.revision,
         ),
       );
+      setPreviewVariant("proposed");
       setNotice(
         "Agent proposal staged at revision " +
           next.revision +
@@ -806,6 +781,11 @@ export function ProofRailApp() {
     try {
       const next = commit((current) =>
         decideProposal(current, selectedClaim.id, decision),
+      );
+      setPreviewVariant(
+        next.claims.some((claim) => claim.proposal?.status === "staged")
+          ? "proposed"
+          : "current",
       );
       setNotice(
         decision === "approve"
@@ -850,20 +830,33 @@ export function ProofRailApp() {
       return;
     }
     if (candidates.length === 0) {
-      setImportError("Add at least one complete sentence of 10 characters or more.");
+      setImportError("Add at least one complete sentence of 3 characters or more.");
       return;
     }
     try {
       const next = commit((current) =>
         replaceReviewPacket(current, {
+          publicationType: importPublicationType,
           title: importTitle,
           headline: importHeadline,
           draftText: normalizedDraft,
-          claims: candidates.map((text) => ({ text, risk: "medium" as const })),
+          claims: [
+            {
+              location: "headline" as const,
+              text: importHeadline.trim(),
+              risk: "medium" as const,
+            },
+            ...candidates.map((text) => ({
+              location: "body" as const,
+              text,
+              risk: "medium" as const,
+            })),
+          ],
           expectedWorkspaceRevision: current.revision,
         }),
       );
       setSelectedClaimId(next.claims[0].id);
+      setPreviewVariant("current");
       setImportError(null);
       setImportOpen(false);
       setReceiptOpen(false);
@@ -1013,19 +1006,30 @@ export function ProofRailApp() {
             <strong>
               ProofRail is a pre-publication review app for marketing and PR teams.
             </strong>{" "}
-            Before a company website, launch page, or report goes live, AI checks
-            every public claim against linked sources. A human approves the exact
-            words and evidence. Until both match, Publish stays locked.
+            Before a project page, blog post, launch page, or report goes live,
+            AI checks every public claim against linked sources. A human approves
+            the exact words and evidence. Until both match, Publish stays locked.
           </p>
+          <div className="mobile-publication-preview">
+            <PublicationPreview
+              workspace={workspace}
+              selectedClaimId={selectedClaimId}
+              variant={previewVariant}
+              size="compact"
+              onVariantChange={setPreviewVariant}
+              onSelectClaim={inspectClaim}
+            />
+          </div>
           <ul className="hero-use-cases" aria-label="Content ProofRail reviews">
-            <li>Company website</li>
+            <li>Project page</li>
+            <li>Blog post</li>
             <li>Launch page</li>
             <li>Report</li>
           </ul>
           <ol className="authority-chain" aria-label="ProofRail release flow">
             <li>
               <span>01 · Draft</span>
-              <strong>Website, launch page, or report enters</strong>
+              <strong>Project, blog, launch page, or report enters</strong>
             </li>
             <li>
               <span>02 · AI check</span>
@@ -1069,26 +1073,26 @@ export function ProofRailApp() {
               (selectedClaimCleared ? "is-cleared" : "is-blocked")
             }
             aria-labelledby="inspection-title"
-            aria-live="polite"
             tabIndex={-1}
           >
             <header className="bay-header">
               <div>
-                <span>Website claim before publication</span>
-                <strong>
+                <span>Publication claim before release</span>
+                <strong id="inspection-title">
                   Claim {selectedClaim.number} · {selectedClaim.risk} risk
                 </strong>
               </div>
               <span className="bay-case">{workspace.title}</span>
             </header>
 
-            <div className="claim-sheet">
-              <p>Claim asking to go live</p>
-              <h2 id="inspection-title">“{selectedClaim.text}”</h2>
-              <span className="inspection-stamp">
-                {selectedClaimCleared ? "Cleared" : "Blocked"}
-              </span>
-            </div>
+            <PublicationPreview
+              workspace={workspace}
+              selectedClaimId={selectedClaimId}
+              variant={previewVariant}
+              size="compact"
+              onVariantChange={setPreviewVariant}
+              onSelectClaim={inspectClaim}
+            />
 
             <div className="source-check">
               <div className="source-label">
@@ -1124,7 +1128,7 @@ export function ProofRailApp() {
               )}
             </div>
 
-            <div className="inspection-verdict">
+            <div className="inspection-verdict" aria-live="polite">
               <span>
                 {selectedClaimCleared ? "Why publish is clear" : "Why publish is blocked"}
               </span>
@@ -1367,44 +1371,24 @@ export function ProofRailApp() {
       <section className="review-packet" aria-labelledby="packet-title">
         <header className="section-heading">
           <div>
-            <p className="section-kicker">The full release packet</p>
-            <h2 id="packet-title">The words on the page and the gate beside them.</h2>
+            <p className="section-kicker">Live publication preview</p>
+            <h2 id="packet-title">See the public page before it ships.</h2>
           </div>
           <p>
-            Highlighted phrases are inspected claims. Select one to return it to
-            the bay with its source attached.
+            Switch between the current draft and unapproved AI wording. Every
+            highlighted phrase stays connected to its source and human decision.
           </p>
         </header>
 
         <div className="packet-layout">
-          <article className="full-draft" aria-labelledby="draft-heading">
-            <header>
-              <div>
-                <span>Draft under review</span>
-                <strong>{workspace.title}</strong>
-              </div>
-              <span>Revision {workspace.revision}</span>
-            </header>
-            <div className="packet-copy">
-              <h3 id="draft-heading">{workspace.headline}</h3>
-              {workspace.draftText.split(/\n\n+/).map((paragraph, index) => (
-                <p key={index}>
-                  {annotatedParagraph(
-                    paragraph,
-                    workspace.claims,
-                    selectedClaimId,
-                    inspectClaim,
-                  ).map((part, partIndex) => (
-                    <Fragment key={partIndex}>{part}</Fragment>
-                  ))}
-                </p>
-              ))}
-            </div>
-            <footer>
-              <span>{workspace.claims.length} claims inspected</span>
-              <span>{workspace.evidence.length} sources attached</span>
-            </footer>
-          </article>
+          <PublicationPreview
+            workspace={workspace}
+            selectedClaimId={selectedClaimId}
+            variant={previewVariant}
+            size="full"
+            onVariantChange={setPreviewVariant}
+            onSelectClaim={inspectClaim}
+          />
 
           <aside
             className={
@@ -1564,6 +1548,20 @@ export function ProofRailApp() {
               </button>
             </div>
             <label>
+              What are you publishing?
+              <select
+                value={importPublicationType}
+                onChange={(event) =>
+                  setImportPublicationType(event.target.value as PublicationType)
+                }
+              >
+                <option value="project-page">Project page</option>
+                <option value="blog-post">Blog post</option>
+                <option value="launch-page">Launch page</option>
+                <option value="report">Report</option>
+              </select>
+            </label>
+            <label>
               Packet title
               <input
                 value={importTitle}
@@ -1594,9 +1592,10 @@ export function ProofRailApp() {
               </p>
             )}
             <p className="import-note">
-              The manual import marks complete sentences as unreviewed candidates.
-              A WebMCP agent can instead submit deliberate atomic spans and risk
-              levels through <code>replace_review_packet</code>.
+              ProofRail immediately renders a simulated publication layout. The
+              full headline and every complete body sentence enter review as exact
+              claim spans. A WebMCP agent can submit deliberate risk levels through
+              <code> replace_review_packet</code>.
             </p>
             <button className="modal-primary" onClick={loadImportedPacket}>
               Load unreviewed packet
@@ -1641,6 +1640,10 @@ export function ProofRailApp() {
                 <dt>Claims</dt>
                 <dd>{workspace.receipt.matrix.length}</dd>
               </div>
+              <div>
+                <dt>Publication</dt>
+                <dd>{workspace.receipt.publicationType.replaceAll("-", " ")}</dd>
+              </div>
               <div className="hash-row">
                 <dt>Content hash</dt>
                 <dd>{workspace.receipt.contentHash}</dd>
@@ -1649,7 +1652,9 @@ export function ProofRailApp() {
             <div className="receipt-matrix">
               {workspace.receipt.matrix.map((row) => (
                 <article key={row.claimId}>
-                  <span>{row.claimId.toUpperCase()}</span>
+                  <span>
+                    {row.claimId.toUpperCase()} · {row.claimLocation}
+                  </span>
                   <p>{row.claimText}</p>
                   <strong>{row.decision}</strong>
                   {row.evidence.map((record) => (

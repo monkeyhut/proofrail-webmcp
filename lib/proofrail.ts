@@ -15,6 +15,12 @@ export type EvidenceRelation =
 export type ProposalStatus = "staged" | "approved" | "rejected";
 export type HumanApproval = "pending" | "approved";
 export type Actor = "agent" | "human" | "system";
+export type ClaimLocation = "headline" | "body";
+export type PublicationType =
+  | "project-page"
+  | "blog-post"
+  | "launch-page"
+  | "report";
 
 export type ResolutionProposal = {
   id: string;
@@ -28,6 +34,7 @@ export type ResolutionProposal = {
 export type ReviewClaim = {
   id: string;
   number: string;
+  location: ClaimLocation;
   text: string;
   originalText: string;
   state: ClaimState;
@@ -81,7 +88,8 @@ export type GateBlocker = {
     | "RESOLUTION_REJECTED"
     | "NO_SUPPORTING_EDGE"
     | "NO_RESOLUTION_EVIDENCE"
-    | "BROKEN_EVIDENCE_EDGE";
+    | "BROKEN_EVIDENCE_EDGE"
+    | "PUBLICATION_COVERAGE_INVALID";
   detail: string;
 };
 
@@ -98,10 +106,14 @@ export type ProofReceipt = {
   generatedAt: string;
   sourceWorkspaceRevision: number;
   contentHash: string;
+  publicationType: PublicationType;
+  previewTemplateVersion: 1;
   title: string;
+  headline: string;
   finalText: string;
   matrix: Array<{
     claimId: string;
+    claimLocation: ClaimLocation;
     claimText: string;
     decision: string;
     evidence: Array<{
@@ -120,6 +132,7 @@ export type ProofReceipt = {
 
 export type Workspace = {
   id: string;
+  publicationType: PublicationType;
   title: string;
   headline: string;
   draftText: string;
@@ -144,10 +157,12 @@ export type AttachEvidenceInput = {
 };
 
 export type ReplacePacketInput = {
+  publicationType: PublicationType;
   title: string;
   headline: string;
   draftText: string;
   claims: Array<{
+    location: ClaimLocation;
     text: string;
     risk: ReviewClaim["risk"];
   }>;
@@ -167,6 +182,7 @@ const initialClaims: ReviewClaim[] = [
   {
     id: "claim-01",
     number: "01",
+    location: "headline",
     text: "Northstar reduces launch handoff time by 42%.",
     originalText: "Northstar reduces launch handoff time by 42%.",
     state: "qualified",
@@ -178,6 +194,7 @@ const initialClaims: ReviewClaim[] = [
   {
     id: "claim-02",
     number: "02",
+    location: "body",
     text: "Every workspace stays encrypted in transit.",
     originalText: "Every workspace stays encrypted in transit.",
     state: "supported",
@@ -189,6 +206,7 @@ const initialClaims: ReviewClaim[] = [
   {
     id: "claim-03",
     number: "03",
+    location: "body",
     text: "Teams can export an evidence packet without an account.",
     originalText: "Teams can export an evidence packet without an account.",
     state: "supported",
@@ -200,6 +218,7 @@ const initialClaims: ReviewClaim[] = [
   {
     id: "claim-04",
     number: "04",
+    location: "body",
     text: "Trusted by 800 launch teams.",
     originalText: "Trusted by 800 launch teams.",
     state: "contradicted",
@@ -297,11 +316,10 @@ export const demoResolutions: Record<
 export function createDemoWorkspace(): Workspace {
   return {
     id: "workspace-northstar",
+    publicationType: "launch-page",
     title: "Northstar launch brief",
-    headline: "Move launches forward without losing the proof.",
+    headline: "Northstar reduces launch handoff time by 42%.",
     draftText: [
-      "Northstar brings decisions, source material, and release checks into one shared workspace.",
-      "Northstar reduces launch handoff time by 42%. Teams keep a clear trail from source to approved language.",
       "Every workspace stays encrypted in transit. Teams can export an evidence packet without an account.",
       "Trusted by 800 launch teams.",
     ].join("\n\n"),
@@ -437,6 +455,14 @@ export function stageResolutionBatch(
   const nextClaims = workspace.claims.map((claim) => {
     const resolution = resolutions.find((item) => item.claimId === claim.id);
     if (!resolution) return claim;
+    if (
+      (claim.state === "supported" || claim.state === "resolved") &&
+      claim.humanApproval === "approved"
+    ) {
+      throw new Error(
+        `CLAIM_ALREADY_RELEASABLE: ${claim.id} cannot be put back into agent review.`,
+      );
+    }
     if (claim.revision !== resolution.expectedClaimRevision) {
       throw new Error(
         `STALE_CLAIM: ${claim.id} expected revision ${resolution.expectedClaimRevision}, current revision is ${claim.revision}.`,
@@ -444,9 +470,15 @@ export function stageResolutionBatch(
     }
     const revisedText = resolution.revisedText.trim();
     const rationale = resolution.rationale.trim();
-    if (revisedText.length < 10 || revisedText.length > 500) {
+    if (revisedText.length < 3 || revisedText.length > 500) {
       throw new Error(
-        `INVALID_REVISION: ${claim.id} must be between 10 and 500 characters.`,
+        `INVALID_REVISION: ${claim.id} must be between 3 and 500 characters.`,
+      );
+    }
+    const revisedSentences = candidateClaimsFromDraft(revisedText);
+    if (revisedSentences.length !== 1 || revisedSentences[0] !== revisedText) {
+      throw new Error(
+        `NON_ATOMIC_REVISION: ${claim.id} must remain one exact public sentence.`,
       );
     }
     if (rationale.length < 10 || rationale.length > 500) {
@@ -523,13 +555,23 @@ export function decideProposal(
       state: approved ? ("resolved" as const) : candidate.state,
       label: approved ? "Human approved" : candidate.label,
       revision: candidate.revision + 1,
-      humanApproval: approved ? ("approved" as const) : ("pending" as const),
+      humanApproval: approved ? ("approved" as const) : candidate.humanApproval,
       proposal: {
         ...candidate.proposal,
         status: approved ? ("approved" as const) : ("rejected" as const),
       },
     };
   });
+
+  const nextHeadline =
+    approved && claim.location === "headline"
+      ? replaceExactClaim(workspace.headline, claim.text, claim.proposal.after)
+      : workspace.headline;
+  const nextDraftText =
+    approved && claim.location === "body"
+      ? replaceExactClaim(workspace.draftText, claim.text, claim.proposal.after)
+      : workspace.draftText;
+  assertPublicationCoverage(nextHeadline, nextDraftText, nextClaims);
 
   const event = auditEvent(
     workspace,
@@ -543,9 +585,8 @@ export function decideProposal(
   return {
     ...workspace,
     revision: workspace.revision + 1,
-    draftText: approved
-      ? replaceExactClaim(workspace.draftText, claim.text, claim.proposal.after)
-      : workspace.draftText,
+    headline: nextHeadline,
+    draftText: nextDraftText,
     claims: nextClaims,
     audit: [...workspace.audit, event],
     receipt: undefined,
@@ -609,6 +650,26 @@ export function attachEvidence(
 ): Workspace {
   assertExpectedRevision(workspace, input.expectedWorkspaceRevision);
   getClaim(workspace, input.claimId);
+
+  const sourceTypes: EvidenceRecord["sourceType"][] = [
+    "internal-study",
+    "engineering-control",
+    "product-test",
+    "public-source",
+    "archive",
+  ];
+  const relations: EvidenceRelation[] = [
+    "supports",
+    "qualifies",
+    "contradicts",
+    "outdated",
+  ];
+  if (!sourceTypes.includes(input.sourceType)) {
+    throw new Error("INVALID_EVIDENCE_SOURCE_TYPE");
+  }
+  if (!relations.includes(input.relation)) {
+    throw new Error("INVALID_EVIDENCE_RELATION");
+  }
 
   const title = input.title.trim();
   const excerpt = input.excerpt.trim();
@@ -693,6 +754,15 @@ export function replaceReviewPacket(
   const title = input.title.trim();
   const headline = input.headline.trim();
   const draftText = input.draftText.trim();
+  const publicationTypes = new Set<PublicationType>([
+    "project-page",
+    "blog-post",
+    "launch-page",
+    "report",
+  ]);
+  if (!publicationTypes.has(input.publicationType)) {
+    throw new Error("INVALID_PUBLICATION_TYPE");
+  }
   if (title.length < 3 || title.length > 120) throw new Error("INVALID_TITLE");
   if (headline.length < 3 || headline.length > 180) {
     throw new Error("INVALID_HEADLINE");
@@ -707,25 +777,36 @@ export function replaceReviewPacket(
   const seen = new Set<string>();
   const claims = input.claims.map((candidate, index): ReviewClaim => {
     const text = candidate.text.trim();
-    if (text.length < 10 || text.length > 500) {
+    if (!(["headline", "body"] as const).includes(candidate.location)) {
+      throw new Error(`INVALID_CLAIM_LOCATION: claim ${index + 1}`);
+    }
+    if (text.length < 3 || text.length > 500) {
       throw new Error(`INVALID_CLAIM_TEXT: claim ${index + 1}`);
     }
-    const firstOccurrence = draftText.indexOf(text);
+    if (!(["low", "medium", "high"] as const).includes(candidate.risk)) {
+      throw new Error(`INVALID_CLAIM_RISK: claim ${index + 1}`);
+    }
+    const publicationField = candidate.location === "headline" ? headline : draftText;
+    const firstOccurrence = publicationField.indexOf(text);
     if (firstOccurrence < 0) {
       throw new Error(
-        `CLAIM_NOT_IN_DRAFT: claim ${index + 1} must match an exact span in draftText.`,
+        `CLAIM_NOT_IN_PUBLICATION: claim ${index + 1} must match its exact ${candidate.location} span.`,
       );
     }
-    if (draftText.indexOf(text, firstOccurrence + 1) >= 0) {
+    if (publicationField.indexOf(text, firstOccurrence + 1) >= 0) {
       throw new Error(
-        `AMBIGUOUS_CLAIM_TEXT: claim ${index + 1} appears more than once in draftText.`,
+        `AMBIGUOUS_CLAIM_TEXT: claim ${index + 1} appears more than once in its ${candidate.location} field.`,
       );
     }
-    if (seen.has(text)) throw new Error(`DUPLICATE_CLAIM_TEXT: claim ${index + 1}`);
-    seen.add(text);
+    const claimKey = `${candidate.location}:${text}`;
+    if (seen.has(claimKey)) {
+      throw new Error(`DUPLICATE_CLAIM_TEXT: claim ${index + 1}`);
+    }
+    seen.add(claimKey);
     return {
       id: `claim-${String(index + 1).padStart(2, "0")}`,
       number: String(index + 1).padStart(2, "0"),
+      location: candidate.location,
       text,
       originalText: text,
       state: "unreviewed",
@@ -736,16 +817,7 @@ export function replaceReviewPacket(
     };
   });
 
-  const candidateSentences = candidateClaimsFromDraft(draftText);
-  const suppliedClaimTexts = new Set(claims.map((claim) => claim.text));
-  const uncoveredSentence = candidateSentences.find(
-    (sentence) => !suppliedClaimTexts.has(sentence),
-  );
-  if (uncoveredSentence) {
-    throw new Error(
-      `INCOMPLETE_CLAIM_COVERAGE: every complete sentence must be represented; missing “${uncoveredSentence}”`,
-    );
-  }
+  assertPublicationCoverage(headline, draftText, claims);
 
   const event = auditEvent(
     workspace,
@@ -756,6 +828,7 @@ export function replaceReviewPacket(
 
   return {
     ...workspace,
+    publicationType: input.publicationType,
     title,
     headline,
     draftText,
@@ -768,9 +841,106 @@ export function replaceReviewPacket(
   };
 }
 
+export type PublicationPreviewVariant = "current" | "proposed";
+
+export type PublicationPreviewProjection = {
+  publicationType: PublicationType;
+  title: string;
+  headline: string;
+  body: string;
+  claims: ReviewClaim[];
+  sourceWorkspaceRevision: number;
+  sealedContentRevision?: number;
+  gateStatus: ReleaseGate["status"];
+  variant: PublicationPreviewVariant;
+  stagedClaimIds: string[];
+  errorCode?: "PROPOSAL_PREVIEW_UNAVAILABLE";
+};
+
+export function buildPublicationPreview(
+  workspace: Workspace,
+  variant: PublicationPreviewVariant,
+): PublicationPreviewProjection {
+  const stagedClaims = workspace.claims.filter(
+    (claim) => claim.proposal?.status === "staged",
+  );
+  const base = {
+    publicationType: workspace.publicationType,
+    title: workspace.title,
+    headline: workspace.headline,
+    body: workspace.draftText,
+    claims: structuredClone(workspace.claims),
+    sourceWorkspaceRevision: workspace.revision,
+    sealedContentRevision: workspace.receipt?.sourceWorkspaceRevision,
+    gateStatus: verifyReleaseGate(workspace).status,
+    variant,
+    stagedClaimIds: stagedClaims.map((claim) => claim.id),
+  };
+
+  if (variant === "current" || stagedClaims.length === 0) return base;
+
+  const replacements = stagedClaims.map((claim) => {
+    const proposal = claim.proposal;
+    if (!proposal || proposal.before !== claim.text) return null;
+    const source = claim.location === "headline" ? workspace.headline : workspace.draftText;
+    const start = source.indexOf(proposal.before);
+    if (start < 0 || source.indexOf(proposal.before, start + 1) >= 0) return null;
+    return {
+      claim,
+      start,
+      end: start + proposal.before.length,
+      replacement: proposal.after,
+    };
+  });
+
+  if (replacements.some((replacement) => replacement === null)) {
+    return { ...base, errorCode: "PROPOSAL_PREVIEW_UNAVAILABLE" };
+  }
+
+  const typedReplacements = replacements.filter(
+    (replacement): replacement is NonNullable<typeof replacement> =>
+      replacement !== null,
+  );
+  for (const location of ["headline", "body"] as const) {
+    const spans = typedReplacements
+      .filter((replacement) => replacement.claim.location === location)
+      .sort((a, b) => a.start - b.start);
+    if (spans.some((span, index) => index > 0 && span.start < spans[index - 1].end)) {
+      return { ...base, errorCode: "PROPOSAL_PREVIEW_UNAVAILABLE" };
+    }
+  }
+
+  const applyReplacements = (source: string, location: ClaimLocation) =>
+    typedReplacements
+      .filter((replacement) => replacement.claim.location === location)
+      .sort((a, b) => b.start - a.start)
+      .reduce(
+        (result, replacement) =>
+          `${result.slice(0, replacement.start)}${replacement.replacement}${result.slice(replacement.end)}`,
+        source,
+      );
+
+  const projectedHeadline = applyReplacements(workspace.headline, "headline");
+  const projectedBody = applyReplacements(workspace.draftText, "body");
+  const projectedClaims = workspace.claims.map((claim) =>
+      claim.proposal?.status === "staged"
+        ? { ...claim, text: claim.proposal.after }
+        : claim,
+  );
+  if (publicationCoverageIssue(projectedHeadline, projectedBody, projectedClaims)) {
+    return { ...base, errorCode: "PROPOSAL_PREVIEW_UNAVAILABLE" };
+  }
+
+  return {
+    ...base,
+    headline: projectedHeadline,
+    body: projectedBody,
+    claims: projectedClaims,
+  };
+}
+
 export function candidateClaimsFromDraft(draftText: string): string[] {
   const sentences = draftText
-    .replace(/\s+/g, " ")
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
@@ -780,17 +950,120 @@ export function candidateClaimsFromDraft(draftText: string): string[] {
       `CLAIM_TOO_LONG: complete sentences may contain at most 500 characters; found ${oversizedSentence.length}.`,
     );
   }
-  const candidates = sentences.filter((sentence) => sentence.length >= 10);
-  if (candidates.length > 12) {
+  const candidates = sentences.filter((sentence) => sentence.length >= 3);
+  if (candidates.length > 11) {
     throw new Error(
-      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 12 complete sentences.`,
+      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 11 body sentences plus its headline.`,
     );
   }
   return candidates;
 }
 
+type PublicationCoverageIssue = {
+  code:
+    | "INCOMPLETE_HEADLINE_COVERAGE"
+    | "INCOMPLETE_CLAIM_COVERAGE"
+    | "NON_ATOMIC_BODY_CLAIM"
+    | "AMBIGUOUS_PUBLICATION_CLAIM"
+    | "OVERLAPPING_PUBLICATION_CLAIMS";
+  detail: string;
+};
+
+function publicationCoverageIssue(
+  headline: string,
+  draftText: string,
+  claims: ReviewClaim[],
+): PublicationCoverageIssue | null {
+  const headlineClaims = claims.filter((claim) => claim.location === "headline");
+  if (headlineClaims.length !== 1 || headlineClaims[0].text !== headline) {
+    return {
+      code: "INCOMPLETE_HEADLINE_COVERAGE",
+      detail: "The complete public headline must be one exact claim.",
+    };
+  }
+
+  const bodySentences = candidateClaimsFromDraft(draftText);
+  const bodyClaims = claims.filter((claim) => claim.location === "body");
+  const sentenceCounts = new Map<string, number>();
+  const claimCounts = new Map<string, number>();
+  for (const sentence of bodySentences) {
+    sentenceCounts.set(sentence, (sentenceCounts.get(sentence) ?? 0) + 1);
+  }
+  for (const claim of bodyClaims) {
+    claimCounts.set(claim.text, (claimCounts.get(claim.text) ?? 0) + 1);
+  }
+
+  const uncoveredSentence = bodySentences.find(
+    (sentence) => (claimCounts.get(sentence) ?? 0) < (sentenceCounts.get(sentence) ?? 0),
+  );
+  if (uncoveredSentence) {
+    return {
+      code: "INCOMPLETE_CLAIM_COVERAGE",
+      detail: `Every complete body sentence must be represented; missing “${uncoveredSentence}”`,
+    };
+  }
+
+  const nonAtomicClaim = bodyClaims.find(
+    (claim) => (sentenceCounts.get(claim.text) ?? 0) === 0,
+  );
+  if (nonAtomicClaim || bodyClaims.length !== bodySentences.length) {
+    return {
+      code: "NON_ATOMIC_BODY_CLAIM",
+      detail: nonAtomicClaim
+        ? `${nonAtomicClaim.id} must equal one complete body sentence.`
+        : "Body claims must map one-to-one to complete public sentences.",
+    };
+  }
+
+  const spans: Array<{ id: string; start: number; end: number }> = [];
+  for (const claim of bodyClaims) {
+    const start = draftText.indexOf(claim.text);
+    if (start < 0 || draftText.indexOf(claim.text, start + 1) >= 0) {
+      return {
+        code: "AMBIGUOUS_PUBLICATION_CLAIM",
+        detail: `${claim.id} must map exactly once in the public body.`,
+      };
+    }
+    spans.push({ id: claim.id, start, end: start + claim.text.length });
+  }
+  spans.sort((left, right) => left.start - right.start);
+  const overlapIndex = spans.findIndex(
+    (span, index) => index > 0 && span.start < spans[index - 1].end,
+  );
+  if (overlapIndex >= 0) {
+    return {
+      code: "OVERLAPPING_PUBLICATION_CLAIMS",
+      detail: `${spans[overlapIndex - 1].id} overlaps ${spans[overlapIndex].id}.`,
+    };
+  }
+
+  return null;
+}
+
+function assertPublicationCoverage(
+  headline: string,
+  draftText: string,
+  claims: ReviewClaim[],
+): void {
+  const issue = publicationCoverageIssue(headline, draftText, claims);
+  if (issue) throw new Error(`${issue.code}: ${issue.detail}`);
+}
+
 export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
   const blockers: GateBlocker[] = [];
+
+  const coverageIssue = publicationCoverageIssue(
+    workspace.headline,
+    workspace.draftText,
+    workspace.claims,
+  );
+  if (coverageIssue) {
+    blockers.push({
+      claimId: "publication",
+      code: "PUBLICATION_COVERAGE_INVALID",
+      detail: `${coverageIssue.code}: ${coverageIssue.detail}`,
+    });
+  }
 
   for (const claim of workspace.claims) {
     if (claim.proposal?.status === "staged") {
@@ -937,6 +1210,7 @@ export async function createProofReceipt(
     const edges = workspace.edges.filter((edge) => edge.claimId === claim.id);
     return {
       claimId: claim.id,
+      claimLocation: claim.location,
       claimText: claim.text,
       decision:
         claim.state === "resolved"
@@ -972,7 +1246,10 @@ export async function createProofReceipt(
 
   const proofContent = {
     sourceWorkspaceRevision: workspace.revision,
+    publicationType: workspace.publicationType,
+    previewTemplateVersion: 1 as const,
     title: workspace.title,
+    headline: workspace.headline,
     finalText: workspace.draftText,
     matrix,
     audit: workspace.audit.slice(packetAuditStart),
