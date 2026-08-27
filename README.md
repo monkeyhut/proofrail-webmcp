@@ -2,12 +2,12 @@
 
 **CI for public claims.**
 
-ProofRail is a pre-publication evidence compiler built for the OpenAI WebMCP
-Challenge. An agent can inspect a live draft, atomize claims, attach typed
-evidence, and stage the smallest defensible revision. A human is the only actor
-allowed to approve language. A deterministic release gate blocks unresolved
-claims; a passing revision can be sealed into a JSON Proof Receipt with a
-SHA-256 content hash.
+ProofRail is not a news site or an AI writer. It is the release gate between a
+draft and the publish button. An agent inspects each public claim against its
+attached evidence and prepares the smallest defensible correction. A human is
+the only actor allowed to approve the final wording and its linked evidence.
+Until every claim clears the fixed rules, publication stays locked; a passing
+revision can be sealed into a JSON Proof Receipt with a SHA-256 content hash.
 
 > ProofRail does not decide truth. It makes evidence gaps, revisions, and human
 > decisions explicit before publication.
@@ -46,7 +46,7 @@ expectedClaimRevision. Stale agent writes fail loudly.
 ## Authority boundary
 
 - Agent: read, structure, attach evidence, and stage.
-- Human: approve or reject claim language.
+- Human: approve linked evidence and the exact claim language that may ship.
 - System: compute blockers and seal a passing revision.
 
 There is intentionally no WebMCP approval tool.
@@ -75,8 +75,9 @@ Individual checks:
 ## Verified in the current build
 
 - TypeScript typecheck passes.
-- Eighteen domain assertions pass, including stale-write rejection, a rejected
-  human proposal, a passing gate, receipt hashing, and an unseen input packet.
+- The domain suite passes, including stale/unknown-write rejection, mandatory
+  human evidence approval, ambiguous-span rejection, full sentence coverage,
+  scoped audit export, receipt provenance, and unseen input packets.
 - ESLint passes.
 - Production build passes.
 - npm audit reports zero known vulnerabilities after pinned security overrides.
@@ -89,14 +90,17 @@ Individual checks:
 - Workspace state is local and intentionally resets on reload.
 - ProofRail stores source excerpts; it does not fetch a URL or certify that a
   source is true.
-- A receipt hash proves that the exported content is internally consistent. It
-  is not a digital signature and does not prove source authenticity.
+- A receipt seals source type, date, URL when supplied, excerpt, relationship,
+  and rationale. Its hash proves internal consistency; it is not a digital
+  signature and does not prove source authenticity.
 - This challenge build has no authentication, database, collaboration server,
   or production retention policy.
 
 See [the trust model](docs/THREAT_MODEL.md) and
-[the submission kit](docs/CHALLENGE_SUBMISSION.md).
+[the submission kit](docs/CHALLENGE_SUBMISSION.md). Generated media provenance
+and licensing caveats are recorded in [the asset manifest](docs/ASSET_PROVENANCE.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT for source code and authored text — see [LICENSE](LICENSE). Generated media
+listed in the asset manifest is excluded from any unverified sublicensing claim.

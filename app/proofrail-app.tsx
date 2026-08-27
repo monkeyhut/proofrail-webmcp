@@ -2,7 +2,8 @@
 
 import {
   Fragment,
-  type CSSProperties,
+  lazy,
+  Suspense,
   type ReactNode,
   useCallback,
   useEffect,
@@ -11,6 +12,7 @@ import {
   useState,
 } from "react";
 import {
+  approveClaimEvidence,
   attachEvidence,
   candidateClaimsFromDraft,
   createDemoWorkspace,
@@ -23,7 +25,6 @@ import {
   storeReceipt,
   verifyReleaseGate,
   type AttachEvidenceInput,
-  type EvidenceRecord,
   type EvidenceRelation,
   type ProofReceipt,
   type ReplacePacketInput,
@@ -32,6 +33,61 @@ import {
   type Workspace,
 } from "../lib/proofrail";
 
+const ProofArtifact = lazy(async () => {
+  const artifactModule = await import("./proof-artifact");
+  return { default: artifactModule.ProofArtifact };
+});
+
+function ArtifactFallback() {
+  return (
+    <div className="artifact-stage artifact-stage-loading" aria-hidden="true">
+      <div className="artifact-loading-mark" />
+      <span>Loading realtime object</span>
+    </div>
+  );
+}
+
+function DeferredProofArtifact({
+  releaseState,
+}: {
+  releaseState: "blocked" | "cleared";
+}) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount || ready) return;
+    if (typeof IntersectionObserver === "undefined") {
+      const fallbackTimer = globalThis.setTimeout(() => setReady(true), 0);
+      return () => globalThis.clearTimeout(fallbackTimer);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setReady(true);
+        observer.disconnect();
+      },
+      { rootMargin: "320px" },
+    );
+    observer.observe(mount);
+    return () => observer.disconnect();
+  }, [ready]);
+
+  return (
+    <div className="artifact-deferred" ref={mountRef}>
+      {ready ? (
+        <Suspense fallback={<ArtifactFallback />}>
+          <ProofArtifact releaseState={releaseState} />
+        </Suspense>
+      ) : (
+        <ArtifactFallback />
+      )}
+    </div>
+  );
+}
+
 type ToolStatus = "checking" | "registered" | "unsupported" | "error";
 
 const relationLabel: Record<EvidenceRelation, string> = {
@@ -39,14 +95,6 @@ const relationLabel: Record<EvidenceRelation, string> = {
   qualifies: "qualifies",
   contradicts: "contradicts",
   outdated: "outdated",
-};
-
-const sourceTypeLabel: Record<EvidenceRecord["sourceType"], string> = {
-  "internal-study": "Internal study",
-  "engineering-control": "Engineering control",
-  "product-test": "Product test",
-  "public-source": "Public source",
-  archive: "Archive",
 };
 
 const toolManifest = [
@@ -58,12 +106,12 @@ const toolManifest = [
   {
     name: "replace_review_packet",
     kind: "write",
-    description: "Load an arbitrary draft and its exact atomic claim spans.",
+    description: "Load a draft with complete, exact sentence coverage.",
   },
   {
     name: "attach_evidence",
     kind: "write",
-    description: "Attach a dated source excerpt through a typed evidence edge.",
+    description: "Attach a dated source; human release approval still remains.",
   },
   {
     name: "stage_resolution_batch",
@@ -82,6 +130,55 @@ const toolManifest = [
   },
 ] as const;
 
+function CinematicVideo({
+  src,
+  className = "",
+}: {
+  src: string;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !reduceMotion.matches) {
+        void video.play().catch(() => undefined);
+      } else {
+        video.pause();
+      }
+    });
+
+    const syncMotionPreference = () => {
+      if (reduceMotion.matches) video.pause();
+    };
+
+    reduceMotion.addEventListener("change", syncMotionPreference);
+    observer.observe(video);
+
+    return () => {
+      reduceMotion.removeEventListener("change", syncMotionPreference);
+      observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <video
+      ref={videoRef}
+      className={className}
+      src={src}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-hidden="true"
+    />
+  );
+}
+
 function reviewContextSnapshot(workspace: Workspace) {
   const gate = verifyReleaseGate(workspace);
   return {
@@ -98,6 +195,7 @@ function reviewContextSnapshot(workspace: Workspace) {
       state: claim.state,
       risk: claim.risk,
       revision: claim.revision,
+      humanApproval: claim.humanApproval,
       proposal: claim.proposal ?? null,
       evidenceEdges: workspace.edges
         .filter((edge) => edge.claimId === claim.id)
@@ -152,7 +250,7 @@ function annotatedParagraph(
         }
         onClick={() => onSelect(match.claim.id)}
         aria-pressed={selectedClaimId === match.claim.id}
-        aria-controls="evidence-decision"
+        aria-controls="inspection-bay"
       >
         {match.claim.text}
         <span>{match.claim.number}</span>
@@ -190,6 +288,7 @@ export function ProofRailApp() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptPending, setReceiptPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const importDialogRef = useRef<HTMLElement>(null);
   const receiptDialogRef = useRef<HTMLElement>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
@@ -215,6 +314,17 @@ export function ProofRailApp() {
   const selectedEdges = selectedClaim
     ? workspace.edges.filter((edge) => edge.claimId === selectedClaim.id)
     : [];
+  const selectedEdge = selectedEdges[0];
+  const selectedEvidence = selectedEdge
+    ? workspace.evidence.find((record) => record.id === selectedEdge.evidenceId)
+    : undefined;
+  const selectedResolution = selectedClaim
+    ? demoResolutions[selectedClaim.id]
+    : undefined;
+  const selectedBlocker = selectedClaim
+    ? gate.blockers.find((blocker) => blocker.claimId === selectedClaim.id)
+    : undefined;
+  const selectedClaimCleared = Boolean(selectedClaim && !selectedBlocker);
   const receiptModalOpen = receiptOpen && Boolean(workspace.receipt);
   const importModalOpen = importOpen && !receiptModalOpen;
 
@@ -309,7 +419,7 @@ export function ProofRailApp() {
         name: "replace_review_packet",
         title: "Load review packet",
         description:
-          "Replace the local ProofRail workspace with an arbitrary draft and exact atomic claim spans. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
+          "Replace the local ProofRail workspace with an arbitrary draft and exact claim spans covering every complete sentence. This clears the current evidence graph and receipt. Use the current workspace revision to prevent overwriting newer human work.",
         inputSchema: {
           type: "object",
           properties: {
@@ -373,7 +483,7 @@ export function ProofRailApp() {
         name: "attach_evidence",
         title: "Attach typed evidence",
         description:
-          "Add one dated source excerpt and connect it to one claim as supports, qualifies, contradicts, or outdated. This changes the live local workspace and invalidates any previous receipt.",
+          "Add one dated source excerpt and connect it to one claim as supports, qualifies, contradicts, or outdated. Public sources require a URL. Agent attachment never grants release approval; a human must still approve the linked evidence and wording. This changes the live local workspace and invalidates any previous receipt.",
         inputSchema: {
           type: "object",
           properties: {
@@ -606,6 +716,15 @@ export function ProofRailApp() {
     setNotice("Demo workspace reset to revision 7.");
   }
 
+  function inspectClaim(claimId: string) {
+    setSelectedClaimId(claimId);
+    requestAnimationFrame(() => {
+      const inspectionBay = document.getElementById("inspection-bay");
+      inspectionBay?.scrollIntoView({ block: "start" });
+      inspectionBay?.focus({ preventScroll: true });
+    });
+  }
+
   function stageDemoResolution(claim: ReviewClaim) {
     const resolution = demoResolutions[claim.id];
     if (!resolution) return;
@@ -654,15 +773,36 @@ export function ProofRailApp() {
     }
   }
 
+  function approveSelectedEvidence() {
+    if (!selectedClaim) return;
+    try {
+      commit((current) => approveClaimEvidence(current, selectedClaim.id));
+      setNotice(
+        "Human approval recorded for the linked evidence and current wording.",
+      );
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to approve evidence.");
+    }
+  }
+
   function loadImportedPacket() {
+    setImportError(null);
     const normalizedDraft = importDraft
       .replace(/\r\n/g, "\n")
       .replace(/[ \t]+/g, " ")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
-    const candidates = candidateClaimsFromDraft(normalizedDraft);
+    let candidates: string[];
+    try {
+      candidates = candidateClaimsFromDraft(normalizedDraft);
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : "Unable to inspect draft.",
+      );
+      return;
+    }
     if (candidates.length === 0) {
-      setNotice("Add at least one complete sentence of 10 characters or more.");
+      setImportError("Add at least one complete sentence of 10 characters or more.");
       return;
     }
     try {
@@ -676,6 +816,7 @@ export function ProofRailApp() {
         }),
       );
       setSelectedClaimId(next.claims[0].id);
+      setImportError(null);
       setImportOpen(false);
       setReceiptOpen(false);
       setNotice(
@@ -684,7 +825,7 @@ export function ProofRailApp() {
           " unreviewed sentence candidates.",
       );
     } catch (error) {
-      setNotice(
+      setImportError(
         error instanceof Error ? error.message : "Unable to load the packet.",
       );
     }
@@ -717,35 +858,43 @@ export function ProofRailApp() {
   }
 
   const statusText: Record<ToolStatus, string> = {
-    checking: "Registering tools",
-    registered: "6 live site tools",
-    unsupported: "WebMCP unavailable",
-    error: "Tool registration error",
+    checking: "WebMCP · connecting",
+    registered: "WebMCP · agent ready",
+    unsupported: "WebMCP · demo mode",
+    error: "WebMCP · unavailable",
   };
 
   return (
-    <main className="proofrail-shell">
+    <main className="proofrail-shell" id="page-top">
       <div
         className="app-surface"
         inert={importModalOpen || receiptModalOpen ? true : undefined}
         aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
       >
         <header className="topbar">
-        <a className="wordmark" href="#workspace" aria-label="ProofRail home">
-          <span className="wordmark-mark" aria-hidden="true">
-            PR
-          </span>
-          <span>ProofRail</span>
-        </a>
+          <a className="wordmark" href="#page-top" aria-label="ProofRail home">
+            <span className="wordmark-mark" aria-hidden="true">
+              PR
+            </span>
+            <span>ProofRail</span>
+          </a>
 
-        <div className="topbar-context" aria-label="Current project">
-          <span className="eyebrow">Evidence compiler</span>
-          <span className="context-name">{workspace.title}</span>
+        <div className="topbar-context" aria-label="Current release status">
+          <span className="eyebrow">Claim release control</span>
+          <span className="context-name">
+            {gate.status === "pass" ? "Release cleared" : "Publication locked"}
+          </span>
         </div>
 
         <div className="top-actions">
-          <button className="quiet-action" onClick={() => setImportOpen(true)}>
-            New packet
+          <button
+            className="quiet-action"
+            onClick={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+          >
+            Load draft
           </button>
           <button className="quiet-action" onClick={resetDemo}>
             Reset demo
@@ -754,6 +903,8 @@ export function ProofRailApp() {
             className={"session-strip tool-status-" + toolStatus}
             onClick={() => setToolsOpen((current) => !current)}
             aria-expanded={toolsOpen}
+            aria-controls="webmcp-tool-drawer"
+            aria-label={`${toolsOpen ? "Close" : "Open"} WebMCP tools. ${statusText[toolStatus]}. ${gate.blockers.length} blockers.`}
           >
             <span className="live-dot" aria-hidden="true" />
             <span>{statusText[toolStatus]}</span>
@@ -764,8 +915,14 @@ export function ProofRailApp() {
         </header>
 
         <div className="mobile-actions" aria-label="Workspace actions">
-          <button className="quiet-action" onClick={() => setImportOpen(true)}>
-            New packet
+          <button
+            className="quiet-action"
+            onClick={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+          >
+            Load draft
           </button>
           <button className="quiet-action" onClick={resetDemo}>
             Reset demo
@@ -773,7 +930,11 @@ export function ProofRailApp() {
         </div>
 
       {toolsOpen && (
-        <section className="tool-drawer" aria-label="ProofRail site tools">
+        <section
+          className="tool-drawer"
+          id="webmcp-tool-drawer"
+          aria-label="ProofRail site tools"
+        >
           <div className="tool-drawer-heading">
             <div>
               <p className="kicker">WebMCP surface</p>
@@ -802,52 +963,189 @@ export function ProofRailApp() {
         </section>
       )}
 
-      <section className="intro" aria-labelledby="page-title">
-        <div>
-          <p className="kicker">Pre-publication evidence control</p>
+      <section className="inspection-hero" aria-labelledby="page-title">
+        <div className="hero-film-layer" aria-hidden="true">
+          <CinematicVideo src="/media/proofrail-block.mp4" />
+          <span className="hero-film-wash" />
+        </div>
+        <div className="hero-message">
+          <p className="hero-eyebrow">Live release gate · 6 WebMCP agent tools</p>
           <h1 id="page-title">
-            <span className="intro-line">
-              <span className="intro-line-inner">Make every public claim</span>
-            </span>
-            <span className="intro-line intro-line-accent">
-              <span className="intro-line-inner">earn its release.</span>
-            </span>
+            <span>No proof.</span>
+            <span>No publish.</span>
           </h1>
-        </div>
-        <div className="intro-copy">
-          <p>
-            An agent can inspect, link evidence, and stage the smallest defensible
-            revision. A human owns the final word.
+          <p className="hero-explainer">
+            ProofRail lets an AI agent inspect a live draft through six WebMCP
+            tools and prepare the smallest honest correction. You approve the
+            words. Until then, release stays locked.
           </p>
-          <div
-            className="progress-line"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={workspace.claims.length}
-            aria-valuenow={gate.releasableClaims}
-            aria-label={
-              gate.releasableClaims +
-              " of " +
-              workspace.claims.length +
-              " claims releasable"
-            }
-          >
-            <span
-              key={gate.releasableClaims}
-              className="progress-fill"
-              style={{
-                width:
-                  (workspace.claims.length
-                    ? (gate.releasableClaims / workspace.claims.length) * 100
-                    : 0) + "%",
-              }}
-            />
-          </div>
-          <span className="progress-caption">
-            {gate.releasableClaims} / {workspace.claims.length} claims releasable ·
-            workspace rev. {workspace.revision}
-          </span>
+          <ol className="authority-chain" aria-label="ProofRail release flow">
+            <li>
+              <span>01</span>
+              <strong>AI finds the mismatch</strong>
+            </li>
+            <li>
+              <span>02</span>
+              <strong>You decide the wording</strong>
+            </li>
+            <li>
+              <span>03</span>
+              <strong>ProofRail unlocks release</strong>
+            </li>
+          </ol>
         </div>
+
+        {selectedClaim && (
+          <article
+            id="inspection-bay"
+            className={
+              "inspection-bay " +
+              (selectedClaimCleared ? "is-cleared" : "is-blocked")
+            }
+            aria-labelledby="inspection-title"
+            aria-live="polite"
+            tabIndex={-1}
+          >
+            <header className="bay-header">
+              <div>
+                <span>Live inspection</span>
+                <strong>
+                  Claim {selectedClaim.number} · {selectedClaim.risk} risk
+                </strong>
+              </div>
+              <span className="bay-case">{workspace.title}</span>
+            </header>
+
+            <div className="claim-sheet">
+              <p>Claim asking to go live</p>
+              <h2 id="inspection-title">“{selectedClaim.text}”</h2>
+              <span className="inspection-stamp">
+                {selectedClaimCleared ? "Cleared" : "Blocked"}
+              </span>
+            </div>
+
+            <div className="source-check">
+              <div className="source-label">
+                <span>What the source actually says</span>
+                {selectedEdge && <strong>{relationLabel[selectedEdge.relation]}</strong>}
+              </div>
+              {selectedEvidence ? (
+                <>
+                  <blockquote>“{selectedEvidence.excerpt}”</blockquote>
+                  <footer>
+                    <span>
+                      {selectedEvidence.title} · {selectedEvidence.sourceType.replaceAll("-", " ")}
+                    </span>
+                    <span className="source-provenance">
+                      <time dateTime={selectedEvidence.publishedAt}>
+                        {selectedEvidence.publishedAt}
+                      </time>
+                      {selectedEvidence.sourceUrl && (
+                        <a
+                          href={selectedEvidence.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open source ↗
+                        </a>
+                      )}
+                      {!selectedEvidence.sourceUrl && <em>No source URL supplied</em>}
+                    </span>
+                  </footer>
+                </>
+              ) : (
+                <p className="missing-source">No source is attached to this claim.</p>
+              )}
+            </div>
+
+            <div className="inspection-verdict">
+              <span>Verdict</span>
+              <strong>
+                {selectedClaimCleared
+                  ? "The language matches the evidence."
+                  : selectedEdge?.rationale ?? "This claim has no usable proof."}
+              </strong>
+            </div>
+
+            {selectedClaim.proposal?.status === "staged" ? (
+              <section className="bay-decision" aria-label="Human decision">
+                <div>
+                  <span>AI-prepared wording</span>
+                  <p>“{selectedClaim.proposal.after}”</p>
+                  <small>Nothing changes until you decide.</small>
+                </div>
+                <div className="bay-human-actions">
+                  <button onClick={() => decideSelected("reject")}>Reject</button>
+                  <button onClick={() => decideSelected("approve")}>
+                    Approve this wording
+                  </button>
+                </div>
+              </section>
+            ) : selectedClaimCleared ? (
+              <div className="bay-cleared-message">
+                <span aria-hidden="true">✓</span>
+                <strong>This claim may continue to the release gate.</strong>
+              </div>
+            ) : selectedClaim.state === "supported" && selectedEvidence ? (
+              <section className="bay-decision" aria-label="Human evidence decision">
+                <div>
+                  <span>Evidence supports this wording</span>
+                  <p>Human release approval is still required.</p>
+                  <small>An agent can attach proof, but it cannot clear the gate.</small>
+                </div>
+                <div className="bay-human-actions">
+                  <button onClick={approveSelectedEvidence}>
+                    Approve evidence and wording
+                  </button>
+                </div>
+              </section>
+            ) : selectedResolution ? (
+              <button
+                className="prepare-button"
+                onClick={() => stageDemoResolution(selectedClaim)}
+              >
+                <span>Preview the agent correction</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            ) : (
+              <div className="bay-cleared-message is-waiting">
+                <span aria-hidden="true">!</span>
+                <strong>The agent must attach proof or prepare safer wording.</strong>
+              </div>
+            )}
+
+            <footer className="bay-gate">
+              <div>
+                <span className="gate-lock" aria-hidden="true" />
+                <strong>
+                  Release gate · {gate.status === "pass" ? "unlocked" : "locked"}
+                </strong>
+              </div>
+              <div
+                className="bay-progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={workspace.claims.length}
+                aria-valuenow={gate.releasableClaims}
+                aria-label={`${gate.releasableClaims} of ${workspace.claims.length} claims cleared`}
+              >
+                {workspace.claims.map((claim) => (
+                  <span
+                    key={claim.id}
+                    className={
+                      claim.state === "supported" || claim.state === "resolved"
+                        ? "is-clear"
+                        : ""
+                    }
+                  />
+                ))}
+              </div>
+              <span>
+                {gate.releasableClaims} of {workspace.claims.length} claims cleared
+              </span>
+            </footer>
+          </article>
+        )}
       </section>
 
       {notice && (
@@ -859,314 +1157,305 @@ export function ProofRailApp() {
         </div>
       )}
 
-      <section className="workspace" id="workspace">
-        <article className="draft-panel" aria-labelledby="draft-heading">
-          <div className="panel-heading">
-            <div>
-              <span className="panel-index">A</span>
-              <p className="eyebrow">Draft under review</p>
-            </div>
-            <span className="revision-chip">rev. {workspace.revision}</span>
+      <section
+        id="block-film"
+        className="cinematic-transition cinematic-block"
+        aria-labelledby="block-film-title"
+      >
+        <CinematicVideo src="/media/proofrail-block.mp4" />
+        <div className="cinematic-scrim" aria-hidden="true" />
+        <div className="cinematic-frame" aria-hidden="true">
+          <span>Scan / 01</span>
+          <span>Evidence mismatch</span>
+          <span>Gate locked</span>
+        </div>
+        <div className="cinematic-copy">
+          <p>One sentence. One source. One hard stop.</p>
+          <h2 id="block-film-title">Claim enters. Proof fails. Gate closes.</h2>
+          <span>
+            “800 launch teams” cannot pass when the source only proves 800
+            waitlist sign-ups.
+          </span>
+        </div>
+      </section>
+
+      <section className="release-queue" id="workspace" aria-labelledby="queue-title">
+        <header className="section-heading">
+          <div>
+            <p className="section-kicker">Inspection queue</p>
+            <h2 id="queue-title">Every claim must clear the same rail.</h2>
           </div>
+          <p>
+            Pick a claim. ProofRail brings its exact source and release decision
+            into the inspection bay above.
+          </p>
+        </header>
 
-          <div className="draft-copy">
-            <p className="document-label">{workspace.title}</p>
-            <h2 id="draft-heading">{workspace.headline}</h2>
-            {workspace.draftText.split(/\n\n+/).map((paragraph, index) => (
-              <p key={index}>
-                {annotatedParagraph(
-                  paragraph,
-                  workspace.claims,
-                  selectedClaimId,
-                  setSelectedClaimId,
-                ).map((part, partIndex) => (
-                  <Fragment key={partIndex}>{part}</Fragment>
-                ))}
-              </p>
-            ))}
-          </div>
-
-          <footer className="draft-footer">
-            <span>{workspace.draftText.split(/\s+/).length} words</span>
-            <span>{workspace.claims.length} atomic claims</span>
-            <span>{workspace.edges.length} evidence edges</span>
-          </footer>
-        </article>
-
-        <section className="rail-panel" aria-labelledby="rail-heading">
-          <div className="panel-heading compact">
-            <div>
-              <span className="panel-index">B</span>
-              <p className="eyebrow" id="rail-heading">
-                Claim rail
-              </p>
-            </div>
-            <span className="rail-key">Live graph</span>
-          </div>
-
-          <div className="claim-rail">
-            {workspace.claims.map((claim, index) => (
+        <div className="queue-track">
+          {workspace.claims.map((claim) => {
+            const blocker = gate.blockers.find((item) => item.claimId === claim.id);
+            const cleared = !blocker;
+            return (
               <button
                 key={claim.id}
                 className={
-                  "rail-node " +
-                  claim.state +
-                  (selectedClaimId === claim.id ? " active" : "")
+                  "queue-claim " +
+                  (cleared ? "is-clear" : "is-blocked") +
+                  (selectedClaimId === claim.id ? " is-active" : "")
                 }
-                onClick={() => setSelectedClaimId(claim.id)}
+                onClick={() => inspectClaim(claim.id)}
                 aria-pressed={selectedClaimId === claim.id}
-                aria-controls="evidence-decision"
-                style={
-                  {
-                    "--rail-delay": `${140 + index * 65}ms`,
-                  } as CSSProperties
-                }
+                aria-controls="inspection-bay"
               >
-                <span className="node-path" aria-hidden="true">
-                  <span className="node-dot" />
-                  {index < workspace.claims.length - 1 && (
-                    <span className="node-line" />
-                  )}
+                <span className="queue-number">C-{claim.number}</span>
+                <span className="queue-copy">
+                  <strong>{claim.text}</strong>
+                  <small>
+                    {claim.proposal?.status === "staged"
+                      ? "Waiting for your decision"
+                      : blocker?.code === "HUMAN_APPROVAL_REQUIRED"
+                        ? "Evidence attached · human approval needed"
+                      : cleared
+                        ? "Evidence matched"
+                        : blocker?.detail ?? claim.label}
+                  </small>
                 </span>
-                <span className="node-content">
-                  <span className="node-meta">
-                    <strong>C-{claim.number}</strong>
-                    <span>
-                      {claim.proposal?.status === "staged"
-                        ? "Human decision pending"
-                        : claim.label}
-                    </span>
-                  </span>
-                  <span className="node-text">{claim.text}</span>
-                  <span className="node-link">
-                    {
-                      workspace.edges.filter((edge) => edge.claimId === claim.id)
-                        .length
-                    }{" "}
-                    evidence edge
-                    {workspace.edges.filter((edge) => edge.claimId === claim.id)
-                      .length === 1
-                      ? ""
-                      : "s"}{" "}
-                    · claim rev. {claim.revision}
-                  </span>
+                <span className="queue-verdict">
+                  {cleared ? "Cleared" : "Blocked"}
                 </span>
               </button>
-            ))}
-          </div>
-        </section>
+            );
+          })}
+        </div>
+      </section>
 
-        <aside
-          className="evidence-panel"
-          id="evidence-decision"
-          aria-labelledby="evidence-heading"
-        >
-          <div className="panel-heading compact">
+      <section className="authority-boundary" aria-labelledby="authority-title">
+        <header className="section-heading inverse">
+          <div>
+            <p className="section-kicker">One hard boundary</p>
+            <h2 id="authority-title">AI prepares. Humans decide. The gate enforces.</h2>
+          </div>
+          <p>
+            ProofRail is not an AI truth oracle. It separates assistance,
+            authority, and release into three visible jobs.
+          </p>
+        </header>
+
+        <div className="role-lane">
+          <article className="role-card role-agent">
+            <span>01 · AI</span>
+            <h3>Inspect and prepare</h3>
+            <p>Read the live draft, attach dated proof, and propose narrower words.</p>
+            <strong>Cannot approve</strong>
+          </article>
+          <article className="role-card role-human">
+            <span>02 · Human</span>
+            <h3>Own the wording</h3>
+            <p>Approve the exact words and linked proof that would appear in public.</p>
+            <strong>The protected decision</strong>
+          </article>
+          <article className="role-card role-system">
+            <span>03 · Gate</span>
+            <h3>Block or release</h3>
+            <p>Apply fixed rules and issue a hashed receipt only after every claim clears.</p>
+            <strong>No confidence theatre</strong>
+          </article>
+        </div>
+      </section>
+
+      <section id="evidence-core" className="evidence-core" aria-labelledby="core-title">
+        <div className="core-copy">
+          <p className="section-kicker">3D / The evidence core</p>
+          <h2 id="core-title">The gate is the product.</h2>
+          <p>
+            ProofRail is not another feed, newsroom, or AI writer. It is the
+            control layer between a draft and the publish button.
+          </p>
+          <dl>
             <div>
-              <span className="panel-index">C</span>
-              <p className="eyebrow" id="evidence-heading">
-                Evidence decision
-              </p>
+              <dt>AI</dt>
+              <dd>Inspects and prepares</dd>
             </div>
-            {selectedClaim && (
-              <span className={"decision-badge " + selectedClaim.state}>
-                {selectedClaim.label}
-              </span>
-            )}
+            <div>
+              <dt>Human</dt>
+              <dd>Owns the final words</dd>
+            </div>
+            <div>
+              <dt>System</dt>
+              <dd>Blocks or releases</dd>
+            </div>
+          </dl>
+        </div>
+        <DeferredProofArtifact
+          releaseState={gate.status === "pass" ? "cleared" : "blocked"}
+        />
+      </section>
+
+      <section className="review-packet" aria-labelledby="packet-title">
+        <header className="section-heading">
+          <div>
+            <p className="section-kicker">The full release packet</p>
+            <h2 id="packet-title">The words on the page and the gate beside them.</h2>
           </div>
+          <p>
+            Highlighted phrases are inspected claims. Select one to return it to
+            the bay with its source attached.
+          </p>
+        </header>
 
-          {selectedClaim ? (
-            <div className="decision-body" key={selectedClaim.id}>
-              <div className="claim-focus">
-                <span className="focus-id">
-                  Claim C-{selectedClaim.number} · {selectedClaim.risk} risk
-                </span>
-                <blockquote>{selectedClaim.text}</blockquote>
+        <div className="packet-layout">
+          <article className="full-draft" aria-labelledby="draft-heading">
+            <header>
+              <div>
+                <span>Draft under review</span>
+                <strong>{workspace.title}</strong>
               </div>
+              <span>Revision {workspace.revision}</span>
+            </header>
+            <div className="packet-copy">
+              <h3 id="draft-heading">{workspace.headline}</h3>
+              {workspace.draftText.split(/\n\n+/).map((paragraph, index) => (
+                <p key={index}>
+                  {annotatedParagraph(
+                    paragraph,
+                    workspace.claims,
+                    selectedClaimId,
+                    inspectClaim,
+                  ).map((part, partIndex) => (
+                    <Fragment key={partIndex}>{part}</Fragment>
+                  ))}
+                </p>
+              ))}
+            </div>
+            <footer>
+              <span>{workspace.claims.length} claims inspected</span>
+              <span>{workspace.evidence.length} sources attached</span>
+            </footer>
+          </article>
 
-              {selectedEdges.length > 0 ? (
-                selectedEdges.map((edge) => {
-                  const item = workspace.evidence.find(
-                    (record) => record.id === edge.evidenceId,
+          <aside
+            className={
+              "release-console " +
+              (gate.status === "pass" ? "is-pass" : "is-blocked")
+            }
+            aria-labelledby="release-title"
+          >
+            <header>
+              <span className="console-signal" aria-hidden="true" />
+              <div>
+                <p>Release gate</p>
+                <h3 id="release-title">
+                  {gate.status === "pass" ? "Ready to seal." : "Publication locked."}
+                </h3>
+              </div>
+            </header>
+
+            <div className="console-counts">
+              <div>
+                <strong>{gate.releasableClaims}</strong>
+                <span>Claims cleared</span>
+              </div>
+              <div>
+                <strong>{gate.blockers.length}</strong>
+                <span>Blockers left</span>
+              </div>
+              <div>
+                <strong>{gate.openHumanDecisions}</strong>
+                <span>Your decisions</span>
+              </div>
+            </div>
+
+            {gate.blockers.length > 0 ? (
+              <ol className="console-blockers">
+                {gate.blockers.slice(0, 4).map((blocker) => {
+                  const claim = workspace.claims.find(
+                    (candidate) => candidate.id === blocker.claimId,
                   );
-                  if (!item) return null;
                   return (
-                    <article className="evidence-card" key={edge.id}>
-                      <div className="evidence-topline">
-                        <span className={"relation relation-" + edge.relation}>
-                          {relationLabel[edge.relation]}
-                        </span>
-                        <span>{item.id.toUpperCase()}</span>
+                    <li key={`${blocker.claimId}-${blocker.code}`}>
+                      <span>C-{claim?.number ?? "--"}</span>
+                      <div>
+                        <strong>{blocker.code.replaceAll("_", " ")}</strong>
+                        <p>{blocker.detail}</p>
                       </div>
-                      <h3>{item.title}</h3>
-                      <p>{item.excerpt}</p>
-                      <p className="edge-rationale">{edge.rationale}</p>
-                      <footer>
-                        <span>{sourceTypeLabel[item.sourceType]}</span>
-                        <time>{item.publishedAt}</time>
-                      </footer>
-                    </article>
+                    </li>
                   );
-                })
-              ) : (
-                <section className="empty-evidence">
-                  <strong>No evidence edge yet</strong>
-                  <p>
-                    Ask the agent to attach a dated excerpt as support, qualifier,
-                    contradiction, or stale evidence.
-                  </p>
-                </section>
-              )}
+                })}
+              </ol>
+            ) : (
+              <div className="receipt-ready">
+                <span aria-hidden="true">✓</span>
+                <div>
+                  <strong>All claims cleared</strong>
+                  <p>The final wording, decisions, sources, and hash can now be sealed.</p>
+                </div>
+              </div>
+            )}
 
-              {selectedClaim.proposal?.status === "staged" ? (
-                <section className="proposal-card is-staged">
-                  <div className="proposal-heading">
-                    <span>Agent proposal</span>
-                    <span>Human decision required</span>
-                  </div>
-                  <p>{selectedClaim.proposal.after}</p>
-                  <small>{selectedClaim.proposal.rationale}</small>
-                  <div className="human-actions">
-                    <button onClick={() => decideSelected("reject")}>
-                      Reject
-                    </button>
-                    <button
-                      className="approve"
-                      onClick={() => decideSelected("approve")}
-                    >
-                      Approve revision
-                    </button>
-                  </div>
-                </section>
-              ) : selectedClaim.proposal?.status === "approved" ? (
-                <section className="clean-card">
-                  <span className="clean-check" aria-hidden="true">
-                    ✓
-                  </span>
-                  <div>
-                    <strong>Human decision recorded</strong>
-                    <p>
-                      The approved scoped language is now in the draft and audit
-                      trail.
-                    </p>
-                  </div>
-                </section>
-              ) : selectedClaim.state === "supported" ? (
-                <section className="clean-card">
-                  <span className="clean-check" aria-hidden="true">
-                    ✓
-                  </span>
-                  <div>
-                    <strong>No language change required</strong>
-                    <p>
-                      A linked record directly supports this claim in its current
-                      scope.
-                    </p>
-                  </div>
-                </section>
-              ) : demoResolutions[selectedClaim.id] ? (
-                <section className="proposal-card">
-                  <div className="proposal-heading">
-                    <span>Safe revision available</span>
-                    <span>Not applied</span>
-                  </div>
-                  <p>{demoResolutions[selectedClaim.id].revisedText}</p>
-                  <small>{demoResolutions[selectedClaim.id].rationale}</small>
-                  <button onClick={() => stageDemoResolution(selectedClaim)}>
-                    {selectedClaim.proposal?.status === "rejected"
-                      ? "Restage agent proposal"
-                      : "Stage agent proposal"}
-                    <span aria-hidden="true">→</span>
-                  </button>
-                </section>
-              ) : (
-                <section className="empty-evidence">
-                  <strong>Agent action required</strong>
-                  <p>
-                    The agent can attach evidence or stage a narrower claim through
-                    the page&apos;s WebMCP tools.
-                  </p>
-                </section>
-              )}
-            </div>
-          ) : (
-            <div className="decision-body">
-              <section className="empty-evidence">
-                <strong>No claim selected</strong>
-              </section>
-            </div>
-          )}
-        </aside>
+            <button
+              className="seal-button"
+              disabled={gate.status !== "pass" || receiptPending}
+              aria-busy={receiptPending}
+              onClick={() => void generateReceipt()}
+            >
+              <span>
+                {receiptPending
+                  ? "Sealing proof receipt…"
+                  : gate.status === "pass"
+                    ? "Seal proof receipt"
+                    : "Receipt stays locked"}
+              </span>
+              <span aria-hidden="true">↗</span>
+            </button>
+          </aside>
+        </div>
       </section>
 
       <section
-        className={
-          "release-band " +
-          (gate.status === "pass" ? "is-pass" : "is-blocked")
-        }
-        aria-labelledby="release-title"
+        id="release-film"
+        className="cinematic-transition cinematic-release"
+        aria-labelledby="release-film-title"
       >
-        <div className="gate-signal" aria-hidden="true">
-          <span className={gate.status === "pass" ? "open" : ""} />
+        <CinematicVideo src="/media/proofrail-release.mp4" />
+        <div className="cinematic-scrim" aria-hidden="true" />
+        <div className="cinematic-frame" aria-hidden="true">
+          <span>Seal / 04</span>
+          <span>Human approved</span>
+          <span>Receipt issued</span>
         </div>
-        <div className="gate-copy">
-          <p className="eyebrow">Deterministic release gate</p>
-          <h2 id="release-title">
-            {gate.status === "pass"
-              ? "Evidence clear. Ready to seal."
-              : "Release blocked by evidence."}
-          </h2>
+        <div className="cinematic-copy">
+          <p>Only after the human says yes.</p>
+          <h2 id="release-film-title">The rail clears. The receipt becomes proof.</h2>
+          <span>
+            Final wording, sources, decisions, revision, and hash travel together.
+          </span>
         </div>
-        <div className="gate-rules">
-          <span>Claim blockers</span>
-          <strong>{gate.blockers.length}</strong>
-          <span>Human decisions open</span>
-          <strong>{gate.openHumanDecisions}</strong>
-          <span>Checked revision</span>
-          <strong>{gate.checkedRevision}</strong>
-        </div>
-        <button
-          className="receipt-button"
-          disabled={gate.status !== "pass" || receiptPending}
-          aria-busy={receiptPending}
-          onClick={() => void generateReceipt()}
-        >
-          {receiptPending
-            ? "Sealing proof receipt…"
-            : gate.status !== "pass"
-            ? "Proof receipt locked"
-            : "Generate proof receipt"}
-          <span aria-hidden="true">↗</span>
-        </button>
       </section>
 
-      <section className="audit-band" aria-labelledby="audit-heading">
-        <div className="audit-heading">
-          <div>
-            <span className="panel-index">D</span>
-            <div>
-              <p className="eyebrow">Immutable decision trail</p>
-              <h2 id="audit-heading">What changed, who decided, which revision.</h2>
-            </div>
-          </div>
-          <span>{workspace.audit.length} events</span>
-        </div>
-        <ol className="audit-list">
-          {workspace.audit
-            .slice()
-            .reverse()
-            .slice(0, 6)
-            .map((event) => (
-              <li key={event.id}>
-                <span className={"actor actor-" + event.actor}>{event.actor}</span>
-                <div>
-                  <strong>{event.action.replaceAll("_", " ")}</strong>
-                  <p>{event.detail}</p>
-                </div>
-                <span>rev. {event.workspaceRevision}</span>
-              </li>
-            ))}
-        </ol>
+      <section className="evidence-log" aria-label="Decision log">
+        <details>
+          <summary>
+            <span>Immutable decision log</span>
+            <strong>{workspace.audit.length} recorded events</strong>
+            <em>Open log</em>
+          </summary>
+          <ol className="audit-list">
+            {workspace.audit
+              .slice()
+              .reverse()
+              .slice(0, 8)
+              .map((event) => (
+                <li key={event.id}>
+                  <span className={"actor actor-" + event.actor}>{event.actor}</span>
+                  <div>
+                    <strong>{event.action.replaceAll("_", " ")}</strong>
+                    <p>{event.detail}</p>
+                  </div>
+                  <span>rev. {event.workspaceRevision}</span>
+                </li>
+              ))}
+          </ol>
+        </details>
       </section>
 
         <footer className="site-footer">
@@ -1186,6 +1475,7 @@ export function ProofRailApp() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="import-title"
+            aria-describedby={importError ? "import-error" : undefined}
             tabIndex={-1}
           >
             <div className="modal-heading">
@@ -1222,6 +1512,11 @@ export function ProofRailApp() {
                 onChange={(event) => setImportDraft(event.target.value)}
               />
             </label>
+            {importError && (
+              <p className="import-error" id="import-error" role="alert">
+                {importError}
+              </p>
+            )}
             <p className="import-note">
               The manual import marks complete sentences as unreviewed candidates.
               A WebMCP agent can instead submit deliberate atomic spans and risk
@@ -1281,7 +1576,11 @@ export function ProofRailApp() {
                   <span>{row.claimId.toUpperCase()}</span>
                   <p>{row.claimText}</p>
                   <strong>{row.decision}</strong>
-                  <small>{row.evidence.length} evidence record(s)</small>
+                  {row.evidence.map((record) => (
+                    <small key={record.evidenceId}>
+                      {record.title} · {record.publishedAt} · {record.sourceType.replaceAll("-", " ")}
+                    </small>
+                  ))}
                 </article>
               ))}
             </div>

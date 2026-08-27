@@ -13,6 +13,7 @@ export type EvidenceRelation =
   | "outdated";
 
 export type ProposalStatus = "staged" | "approved" | "rejected";
+export type HumanApproval = "pending" | "approved";
 export type Actor = "agent" | "human" | "system";
 
 export type ResolutionProposal = {
@@ -33,6 +34,7 @@ export type ReviewClaim = {
   label: string;
   risk: "low" | "medium" | "high";
   revision: number;
+  humanApproval: HumanApproval;
   proposal?: ResolutionProposal;
 };
 
@@ -75,8 +77,11 @@ export type GateBlocker = {
     | "CONTRADICTED"
     | "OUTDATED"
     | "HUMAN_REVIEW_PENDING"
+    | "HUMAN_APPROVAL_REQUIRED"
     | "RESOLUTION_REJECTED"
-    | "NO_SUPPORTING_EDGE";
+    | "NO_SUPPORTING_EDGE"
+    | "NO_RESOLUTION_EVIDENCE"
+    | "BROKEN_EVIDENCE_EDGE";
   detail: string;
 };
 
@@ -102,8 +107,12 @@ export type ProofReceipt = {
     evidence: Array<{
       evidenceId: string;
       title: string;
+      sourceType: EvidenceRecord["sourceType"];
+      publishedAt: string;
+      sourceUrl: string | null;
       relation: EvidenceRelation;
       excerpt: string;
+      rationale: string;
     }>;
   }>;
   audit: AuditEvent[];
@@ -164,6 +173,7 @@ const initialClaims: ReviewClaim[] = [
     label: "Needs qualifier",
     risk: "high",
     revision: 1,
+    humanApproval: "pending",
   },
   {
     id: "claim-02",
@@ -174,6 +184,7 @@ const initialClaims: ReviewClaim[] = [
     label: "Supported",
     risk: "high",
     revision: 1,
+    humanApproval: "approved",
   },
   {
     id: "claim-03",
@@ -184,6 +195,7 @@ const initialClaims: ReviewClaim[] = [
     label: "Supported",
     risk: "medium",
     revision: 1,
+    humanApproval: "approved",
   },
   {
     id: "claim-04",
@@ -194,6 +206,7 @@ const initialClaims: ReviewClaim[] = [
     label: "Contradicted + stale",
     risk: "high",
     revision: 1,
+    humanApproval: "pending",
   },
 ];
 
@@ -313,6 +326,14 @@ export function createDemoWorkspace(): Workspace {
         detail: "Four atomic claims linked to four typed evidence relationships.",
         workspaceRevision: 7,
       },
+      {
+        id: "audit-03",
+        at: "2026-08-27T08:02:00.000Z",
+        actor: "human",
+        action: "SUPPORTED_CLAIMS_APPROVED",
+        detail: "Human review approved the linked evidence for claim-02 and claim-03.",
+        workspaceRevision: 7,
+      },
     ],
   };
 }
@@ -364,6 +385,11 @@ function replaceExactClaim(
       "CLAIM_TEXT_MISMATCH: the current claim text is no longer present in the draft.",
     );
   }
+  if (draftText.indexOf(before, index + 1) >= 0) {
+    throw new Error(
+      "AMBIGUOUS_CLAIM_TEXT: the current claim text appears more than once in the draft.",
+    );
+  }
   return `${draftText.slice(0, index)}${after}${draftText.slice(index + before.length)}`;
 }
 
@@ -404,6 +430,10 @@ export function stageResolutionBatch(
     throw new Error(`DUPLICATE_CLAIM: ${duplicateIds[0]}`);
   }
 
+  for (const resolution of resolutions) {
+    getClaim(workspace, resolution.claimId);
+  }
+
   const nextClaims = workspace.claims.map((claim) => {
     const resolution = resolutions.find((item) => item.claimId === claim.id);
     if (!resolution) return claim;
@@ -426,6 +456,21 @@ export function stageResolutionBatch(
     }
     if (revisedText === claim.text) {
       throw new Error(`NO_CHANGE: ${claim.id} revision matches the current claim.`);
+    }
+
+    const claimEdges = workspace.edges.filter((edge) => edge.claimId === claim.id);
+    if (claimEdges.length === 0) {
+      throw new Error(
+        `NO_LINKED_EVIDENCE: ${claim.id} needs at least one evidence edge before a resolution can be staged.`,
+      );
+    }
+    const brokenEdge = claimEdges.find(
+      (edge) => !workspace.evidence.some((record) => record.id === edge.evidenceId),
+    );
+    if (brokenEdge) {
+      throw new Error(
+        `BROKEN_EDGE: ${brokenEdge.id} references missing evidence.`,
+      );
     }
 
     return {
@@ -478,6 +523,7 @@ export function decideProposal(
       state: approved ? ("resolved" as const) : candidate.state,
       label: approved ? "Human approved" : candidate.label,
       revision: candidate.revision + 1,
+      humanApproval: approved ? ("approved" as const) : ("pending" as const),
       proposal: {
         ...candidate.proposal,
         status: approved ? ("approved" as const) : ("rejected" as const),
@@ -501,6 +547,57 @@ export function decideProposal(
       ? replaceExactClaim(workspace.draftText, claim.text, claim.proposal.after)
       : workspace.draftText,
     claims: nextClaims,
+    audit: [...workspace.audit, event],
+    receipt: undefined,
+  };
+}
+
+export function approveClaimEvidence(
+  workspace: Workspace,
+  claimId: string,
+): Workspace {
+  const claim = getClaim(workspace, claimId);
+  if (claim.proposal?.status === "staged") {
+    throw new Error(`HUMAN_REVIEW_PENDING: ${claimId} has a staged language change.`);
+  }
+  if (claim.state !== "supported") {
+    throw new Error(
+      `EVIDENCE_NOT_SUPPORTING: ${claimId} is ${claim.state}, not supported.`,
+    );
+  }
+
+  const supportEdges = workspace.edges.filter(
+    (edge) => edge.claimId === claimId && edge.relation === "supports",
+  );
+  if (supportEdges.length === 0) {
+    throw new Error(`NO_SUPPORTING_EDGE: ${claimId}`);
+  }
+  const brokenEdge = supportEdges.find(
+    (edge) => !workspace.evidence.some((record) => record.id === edge.evidenceId),
+  );
+  if (brokenEdge) {
+    throw new Error(`BROKEN_EDGE: ${brokenEdge.id} references missing evidence.`);
+  }
+
+  const event = auditEvent(
+    workspace,
+    "human",
+    "EVIDENCE_APPROVED",
+    `Approved the linked evidence and current wording for ${claimId}.`,
+  );
+
+  return {
+    ...workspace,
+    revision: workspace.revision + 1,
+    claims: workspace.claims.map((candidate) =>
+      candidate.id === claimId
+        ? {
+            ...candidate,
+            humanApproval: "approved" as const,
+            revision: candidate.revision + 1,
+          }
+        : candidate,
+    ),
     audit: [...workspace.audit, event],
     receipt: undefined,
   };
@@ -534,6 +631,9 @@ export function attachEvidence(
       throw new Error("INVALID_SOURCE_URL: only HTTP(S) URLs are accepted.");
     }
   }
+  if (input.sourceType === "public-source" && !input.sourceUrl) {
+    throw new Error("SOURCE_URL_REQUIRED: public sources need an HTTP(S) URL.");
+  }
 
   const evidenceId = `evidence-${String(workspace.evidence.length + 1).padStart(2, "0")}`;
   const edgeId = `edge-${String(workspace.edges.length + 1).padStart(2, "0")}`;
@@ -563,6 +663,7 @@ export function attachEvidence(
           state: nextState,
           label: labelForState(nextState),
           revision: claim.revision + 1,
+          humanApproval: "pending" as const,
         }
       : claim,
   );
@@ -609,9 +710,15 @@ export function replaceReviewPacket(
     if (text.length < 10 || text.length > 500) {
       throw new Error(`INVALID_CLAIM_TEXT: claim ${index + 1}`);
     }
-    if (!draftText.includes(text)) {
+    const firstOccurrence = draftText.indexOf(text);
+    if (firstOccurrence < 0) {
       throw new Error(
         `CLAIM_NOT_IN_DRAFT: claim ${index + 1} must match an exact span in draftText.`,
+      );
+    }
+    if (draftText.indexOf(text, firstOccurrence + 1) >= 0) {
+      throw new Error(
+        `AMBIGUOUS_CLAIM_TEXT: claim ${index + 1} appears more than once in draftText.`,
       );
     }
     if (seen.has(text)) throw new Error(`DUPLICATE_CLAIM_TEXT: claim ${index + 1}`);
@@ -625,8 +732,20 @@ export function replaceReviewPacket(
       label: "Unreviewed",
       risk: candidate.risk,
       revision: 1,
+      humanApproval: "pending",
     };
   });
+
+  const candidateSentences = candidateClaimsFromDraft(draftText);
+  const suppliedClaimTexts = new Set(claims.map((claim) => claim.text));
+  const uncoveredSentence = candidateSentences.find(
+    (sentence) => !suppliedClaimTexts.has(sentence),
+  );
+  if (uncoveredSentence) {
+    throw new Error(
+      `INCOMPLETE_CLAIM_COVERAGE: every complete sentence must be represented; missing “${uncoveredSentence}”`,
+    );
+  }
 
   const event = auditEvent(
     workspace,
@@ -650,12 +769,24 @@ export function replaceReviewPacket(
 }
 
 export function candidateClaimsFromDraft(draftText: string): string[] {
-  return draftText
+  const sentences = draftText
     .replace(/\s+/g, " ")
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence.length >= 10 && sentence.length <= 500)
-    .slice(0, 8);
+    .filter(Boolean);
+  const oversizedSentence = sentences.find((sentence) => sentence.length > 500);
+  if (oversizedSentence) {
+    throw new Error(
+      `CLAIM_TOO_LONG: complete sentences may contain at most 500 characters; found ${oversizedSentence.length}.`,
+    );
+  }
+  const candidates = sentences.filter((sentence) => sentence.length >= 10);
+  if (candidates.length > 12) {
+    throw new Error(
+      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 12 complete sentences.`,
+    );
+  }
+  return candidates;
 }
 
 export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
@@ -670,13 +801,41 @@ export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
       });
       continue;
     }
-    if (claim.state === "resolved") continue;
+
+    const claimEdges = workspace.edges.filter((edge) => edge.claimId === claim.id);
+    const brokenEdge = claimEdges.find(
+      (edge) => !workspace.evidence.some((record) => record.id === edge.evidenceId),
+    );
+    if (brokenEdge) {
+      blockers.push({
+        claimId: claim.id,
+        code: "BROKEN_EVIDENCE_EDGE",
+        detail: `Evidence edge ${brokenEdge.id} references a missing record.`,
+      });
+      continue;
+    }
     if (claim.proposal?.status === "rejected") {
       blockers.push({
         claimId: claim.id,
         code: "RESOLUTION_REJECTED",
         detail: "The proposed fix was rejected and no replacement has been approved.",
       });
+      continue;
+    }
+    if (claim.state === "resolved") {
+      if (claimEdges.length === 0) {
+        blockers.push({
+          claimId: claim.id,
+          code: "NO_RESOLUTION_EVIDENCE",
+          detail: "Human-approved wording still needs at least one linked evidence record.",
+        });
+      } else if (claim.humanApproval !== "approved") {
+        blockers.push({
+          claimId: claim.id,
+          code: "HUMAN_APPROVAL_REQUIRED",
+          detail: "The final wording still requires explicit human approval.",
+        });
+      }
       continue;
     }
     if (claim.state === "unreviewed") {
@@ -712,14 +871,18 @@ export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
       continue;
     }
     if (claim.state === "supported") {
-      const supportEdges = workspace.edges.filter(
-        (edge) => edge.claimId === claim.id && edge.relation === "supports",
-      );
+      const supportEdges = claimEdges.filter((edge) => edge.relation === "supports");
       if (supportEdges.length === 0) {
         blockers.push({
           claimId: claim.id,
           code: "NO_SUPPORTING_EDGE",
           detail: "The claim is marked supported but has no supporting evidence edge.",
+        });
+      } else if (claim.humanApproval !== "approved") {
+        blockers.push({
+          claimId: claim.id,
+          code: "HUMAN_APPROVAL_REQUIRED",
+          detail: "Linked evidence is present, but a human has not approved this wording for release.",
         });
       }
     }
@@ -729,8 +892,10 @@ export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
     status: blockers.length === 0 ? "pass" : "blocked",
     checkedRevision: workspace.revision,
     blockers,
-    openHumanDecisions: workspace.claims.filter(
-      (claim) => claim.proposal?.status === "staged",
+    openHumanDecisions: blockers.filter(
+      (blocker) =>
+        blocker.code === "HUMAN_REVIEW_PENDING" ||
+        blocker.code === "HUMAN_APPROVAL_REQUIRED",
     ).length,
     releasableClaims: workspace.claims.length - blockers.length,
   };
@@ -774,7 +939,9 @@ export async function createProofReceipt(
       claimId: claim.id,
       claimText: claim.text,
       decision:
-        claim.state === "resolved" ? "human-approved resolution" : "supported",
+        claim.state === "resolved"
+          ? "human-approved resolution"
+          : "human-approved evidence",
       evidence: edges.map((edge) => {
         const record = workspace.evidence.find(
           (candidate) => candidate.id === edge.evidenceId,
@@ -785,11 +952,22 @@ export async function createProofReceipt(
         return {
           evidenceId: record.id,
           title: record.title,
+          sourceType: record.sourceType,
+          publishedAt: record.publishedAt,
+          sourceUrl: record.sourceUrl ?? null,
           relation: edge.relation,
           excerpt: record.excerpt,
+          rationale: edge.rationale,
         };
       }),
     };
+  });
+
+  let packetAuditStart = 0;
+  workspace.audit.forEach((event, index) => {
+    if (event.action === "PACKET_IMPORTED" || event.action === "PACKET_REPLACED") {
+      packetAuditStart = index;
+    }
   });
 
   const proofContent = {
@@ -797,7 +975,7 @@ export async function createProofReceipt(
     title: workspace.title,
     finalText: workspace.draftText,
     matrix,
-    audit: workspace.audit,
+    audit: workspace.audit.slice(packetAuditStart),
   };
   const contentHash = await sha256Hex(stableStringify(proofContent));
 

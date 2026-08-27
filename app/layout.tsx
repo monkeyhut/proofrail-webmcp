@@ -15,7 +15,7 @@ export const metadata: Metadata = {
         url: "/proofrail-social.png",
         width: 1200,
         height: 630,
-        alt: "An editorial evidence graph with source cards, a proof rail, and a blocked contradiction.",
+        alt: "An ivory document approaching a coral inspection gate on a black precision rail.",
       },
     ],
   },

@@ -24,12 +24,13 @@ claims to dated source excerpts, marks each relationship as support,
 qualification, contradiction, or outdated evidence, and stages the smallest
 defensible language changes.
 
-The agent cannot approve its own work. A human accepts or rejects each proposal
-in the shared interface. ProofRail then runs deterministic rules—not an opaque
-confidence score—to block unsupported, contradicted, stale, or unreviewed
-claims. A passing revision produces a Proof Receipt containing the final text,
-claim-evidence matrix, decision log, workspace revision, and SHA-256 content
-hash.
+The agent cannot approve its own work. A human accepts the linked evidence and
+exact final wording in the shared interface, or rejects a proposed correction.
+ProofRail then runs deterministic rules—not an opaque confidence score—to block
+unsupported, contradicted, stale, unreviewed, or human-unapproved claims. A
+passing revision produces a Proof Receipt containing complete evidence
+provenance, the claim-evidence matrix, packet-scoped decision log, workspace
+revision, and SHA-256 content hash.
 
 The result is not an AI truth oracle. It is CI for public claims: a visible,
 auditable boundary between agent assistance and human publishing authority.
@@ -46,13 +47,13 @@ auditable boundary between agent assistance and human publishing authority.
 
 | Time | Picture | Narration |
 | --- | --- | --- |
-| 0:00–0:12 | Blocked gate and four-claim rail | “A polished sentence can ship faster than its evidence. ProofRail makes claims pass a release gate first.” |
+| 0:00–0:12 | “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “A polished sentence can ship faster than its evidence. ProofRail makes claims pass a release gate first.” |
 | 0:12–0:28 | Open available site tools | “The page exposes six WebMCP tools over the same live state the human sees.” |
 | 0:28–0:48 | Agent calls get_review_context | “The agent sees exact claim revisions and typed evidence—not a screenshot.” |
 | 0:48–1:06 | Agent calls stage_resolution_batch; graph updates | “It narrows two claims, but cannot approve its own work.” |
 | 1:06–1:25 | Human approves C-01 and rejects C-04 | “The human accepts one and rejects one. That conflict is the product, not an error.” |
 | 1:25–1:44 | Agent re-reads and stages a new C-04 proposal | “The agent adapts to the new revision instead of overwriting it.” |
-| 1:44–1:58 | Human approves; gate turns green | “Deterministic rules now pass all four claims.” |
+| 1:44–1:58 | Human approves; the rail clears in the 3D gate view | “Deterministic rules now pass all four claims.” |
 | 1:58–2:12 | Agent exports receipt; hash and matrix appear | “The final text, evidence matrix, decisions, and SHA-256 hash become one proof receipt.” |
 | 2:12–2:25 | Load unseen Arbor draft | “And it is not hard-coded: an unseen draft becomes a fresh blocked claim rail through the same tools.” |
 
