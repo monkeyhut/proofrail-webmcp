@@ -250,12 +250,14 @@ export function ProofArtifact({ releaseState }: { releaseState: ReleaseState }) 
       visible = entry.isIntersecting;
     });
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
+    timer.connect(document);
 
-    const render = () => {
+    const render = (timestamp: number) => {
+      timer.update(timestamp);
       if (!visible) return;
 
-      const elapsed = clock.getElapsedTime();
+      const elapsed = timer.getElapsed();
       const reduced = reduceMotion.matches;
       const cleared = releaseStateRef.current === "cleared";
       pointer.lerp(pointerTarget, 0.045);
@@ -278,8 +280,8 @@ export function ProofArtifact({ releaseState }: { releaseState: ReleaseState }) 
       renderer.render(scene, camera);
     };
 
-    const animate = () => {
-      render();
+    const animate = (timestamp: number) => {
+      render(timestamp);
       frame = window.requestAnimationFrame(animate);
     };
 
@@ -288,7 +290,7 @@ export function ProofArtifact({ releaseState }: { releaseState: ReleaseState }) 
     host.addEventListener("pointermove", onPointerMove);
     host.addEventListener("pointerleave", onPointerLeave);
     resize();
-    animate();
+    frame = window.requestAnimationFrame(animate);
 
     return () => {
       disposed = true;
@@ -301,6 +303,7 @@ export function ProofArtifact({ releaseState }: { releaseState: ReleaseState }) 
       scene.environment?.dispose();
       pmrem.dispose();
       renderer.dispose();
+      timer.dispose();
     };
   }, []);
 

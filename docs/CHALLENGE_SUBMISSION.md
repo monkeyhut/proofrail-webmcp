@@ -9,11 +9,12 @@
 
 ## Title
 
-ProofRail — CI for public claims
+ProofRail — The pre-publication claim gate
 
 ## Tagline
 
-The agent assembles the evidence. The human decides what may ship.
+Before company content goes live, AI checks the proof, a human approves the
+exact words, and ProofRail controls Publish.
 
 ## Short description
 
@@ -47,7 +48,7 @@ auditable boundary between agent assistance and human publishing authority.
 
 | Time | Picture | Narration |
 | --- | --- | --- |
-| 0:00–0:12 | “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “A polished sentence can ship faster than its evidence. ProofRail makes claims pass a release gate first.” |
+| 0:00–0:12 | Hero definition, then “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “Before a company website, launch page, or report goes live, ProofRail checks every factual claim against its evidence.” |
 | 0:12–0:28 | Open available site tools | “The page exposes six WebMCP tools over the same live state the human sees.” |
 | 0:28–0:48 | Agent calls get_review_context | “The agent sees exact claim revisions and typed evidence—not a screenshot.” |
 | 0:48–1:06 | Agent calls stage_resolution_batch; graph updates | “It narrows two claims, but cannot approve its own work.” |
@@ -91,13 +92,14 @@ receipt is the build artifact.
 - [x] Functional WebMCP implementation
 - [x] English product copy
 - [x] Public-license file
+- [x] Public repository with GitHub-detected MIT license
 - [x] Reproducible local verification commands
 - [x] Social preview artwork
 - [x] Public GitHub repository URL
-- [ ] Public live deployment URL (production deploy passes; public access is
-  still pending)
+- [x] Five-second comprehension contract at 100/100 in the local gauntlet
+- [ ] Public live deployment URL and judge-equivalent WebMCP re-test
 - [ ] Public YouTube demo with audio, under three minutes
 - [ ] Devpost description, screenshots, URLs, and final submit
 
-Do not mark the last four items complete without checking the real public
-targets.
+Do not mark the remaining items complete without checking the real public
+targets. See `docs/CHALLENGE_COMPLIANCE.md` for the official requirement matrix.

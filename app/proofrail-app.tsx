@@ -133,15 +133,61 @@ const toolManifest = [
 function CinematicVideo({
   src,
   className = "",
+  eager = false,
 }: {
   src: string;
   className?: string;
+  eager?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [sourceEnabled, setSourceEnabled] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const desktopViewport = window.matchMedia("(min-width: 781px)");
+    let activationTimer: number | undefined;
+
+    const enableSource = () => {
+      if (reduceMotion.matches || !desktopViewport.matches) return;
+      setSourceEnabled(true);
+    };
+
+    if (eager) {
+      const scheduleActivation = () => {
+        activationTimer = window.setTimeout(enableSource, 1200);
+      };
+      if (document.readyState === "complete") scheduleActivation();
+      else window.addEventListener("load", scheduleActivation, { once: true });
+
+      return () => {
+        window.removeEventListener("load", scheduleActivation);
+        if (activationTimer) window.clearTimeout(activationTimer);
+      };
+    }
+
+    const activationObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || entry.intersectionRatio <= 0) return;
+        enableSource();
+        activationObserver.disconnect();
+      },
+      { threshold: 0.02 },
+    );
+    activationObserver.observe(video);
+
+    return () => {
+      activationObserver.disconnect();
+      if (activationTimer) window.clearTimeout(activationTimer);
+    };
+  }, [eager]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !sourceEnabled) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const observer = new IntersectionObserver(([entry]) => {
@@ -163,17 +209,19 @@ function CinematicVideo({
       reduceMotion.removeEventListener("change", syncMotionPreference);
       observer.disconnect();
     };
-  }, []);
+  }, [sourceEnabled]);
 
   return (
     <video
       ref={videoRef}
       className={className}
-      src={src}
+      src={sourceEnabled ? src : undefined}
+      data-film-ready={ready ? "true" : "false"}
+      onCanPlay={() => setReady(true)}
       muted
       loop
       playsInline
-      preload="metadata"
+      preload="none"
       aria-hidden="true"
     />
   );
@@ -872,7 +920,7 @@ export function ProofRailApp() {
         aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
       >
         <header className="topbar">
-          <a className="wordmark" href="#page-top" aria-label="ProofRail home">
+          <a className="wordmark" href="#page-top">
             <span className="wordmark-mark" aria-hidden="true">
               PR
             </span>
@@ -880,7 +928,7 @@ export function ProofRailApp() {
           </a>
 
         <div className="topbar-context" aria-label="Current release status">
-          <span className="eyebrow">Claim release control</span>
+          <span className="eyebrow">Pre-publish claim control</span>
           <span className="context-name">
             {gate.status === "pass" ? "Release cleared" : "Publication locked"}
           </span>
@@ -913,21 +961,6 @@ export function ProofRailApp() {
           </button>
         </div>
         </header>
-
-        <div className="mobile-actions" aria-label="Workspace actions">
-          <button
-            className="quiet-action"
-            onClick={() => {
-              setImportError(null);
-              setImportOpen(true);
-            }}
-          >
-            Load draft
-          </button>
-          <button className="quiet-action" onClick={resetDemo}>
-            Reset demo
-          </button>
-        </div>
 
       {toolsOpen && (
         <section
@@ -965,34 +998,67 @@ export function ProofRailApp() {
 
       <section className="inspection-hero" aria-labelledby="page-title">
         <div className="hero-film-layer" aria-hidden="true">
-          <CinematicVideo src="/media/proofrail-block.mp4" />
+          <CinematicVideo src="/media/proofrail-block.mp4" eager />
           <span className="hero-film-wash" />
         </div>
         <div className="hero-message">
-          <p className="hero-eyebrow">Live release gate · 6 WebMCP agent tools</p>
+          <p className="hero-eyebrow">
+            Pre-publication release gate · for marketing &amp; PR
+          </p>
           <h1 id="page-title">
             <span>No proof.</span>
             <span>No publish.</span>
           </h1>
-          <p className="hero-explainer">
-            ProofRail lets an AI agent inspect a live draft through six WebMCP
-            tools and prepare the smallest honest correction. You approve the
-            words. Until then, release stays locked.
+          <p className="hero-definition">
+            <strong>
+              ProofRail is a pre-publication review app for marketing and PR teams.
+            </strong>{" "}
+            Before a company website, launch page, or report goes live, AI checks
+            every public claim against linked sources. A human approves the exact
+            words and evidence. Until both match, Publish stays locked.
           </p>
+          <ul className="hero-use-cases" aria-label="Content ProofRail reviews">
+            <li>Company website</li>
+            <li>Launch page</li>
+            <li>Report</li>
+          </ul>
           <ol className="authority-chain" aria-label="ProofRail release flow">
             <li>
-              <span>01</span>
-              <strong>AI finds the mismatch</strong>
+              <span>01 · Draft</span>
+              <strong>Website, launch page, or report enters</strong>
             </li>
             <li>
-              <span>02</span>
-              <strong>You decide the wording</strong>
+              <span>02 · AI check</span>
+              <strong>Claims are matched to linked sources</strong>
             </li>
             <li>
-              <span>03</span>
-              <strong>ProofRail unlocks release</strong>
+              <span>03 · Human</span>
+              <strong>You approve the exact words and evidence</strong>
+            </li>
+            <li>
+              <span>04 · Publish</span>
+              <strong>The gate unlocks only when every claim clears</strong>
             </li>
           </ol>
+          <div className="hero-tech-line" aria-label="Technical implementation">
+            <span>Live app</span>
+            <span>6 WebMCP tools</span>
+            <span>SHA-256 proof receipt</span>
+          </div>
+          <div className="mobile-actions" aria-label="Workspace actions">
+            <button
+              className="quiet-action"
+              onClick={() => {
+                setImportError(null);
+                setImportOpen(true);
+              }}
+            >
+              Load a draft
+            </button>
+            <button className="quiet-action" onClick={resetDemo}>
+              Reset demo
+            </button>
+          </div>
         </div>
 
         {selectedClaim && (
@@ -1008,7 +1074,7 @@ export function ProofRailApp() {
           >
             <header className="bay-header">
               <div>
-                <span>Live inspection</span>
+                <span>Website claim before publication</span>
                 <strong>
                   Claim {selectedClaim.number} · {selectedClaim.risk} risk
                 </strong>
@@ -1026,7 +1092,7 @@ export function ProofRailApp() {
 
             <div className="source-check">
               <div className="source-label">
-                <span>What the source actually says</span>
+                <span>What the source proves</span>
                 {selectedEdge && <strong>{relationLabel[selectedEdge.relation]}</strong>}
               </div>
               {selectedEvidence ? (
@@ -1059,7 +1125,9 @@ export function ProofRailApp() {
             </div>
 
             <div className="inspection-verdict">
-              <span>Verdict</span>
+              <span>
+                {selectedClaimCleared ? "Why publish is clear" : "Why publish is blocked"}
+              </span>
               <strong>
                 {selectedClaimCleared
                   ? "The language matches the evidence."
@@ -1104,7 +1172,10 @@ export function ProofRailApp() {
                 className="prepare-button"
                 onClick={() => stageDemoResolution(selectedClaim)}
               >
-                <span>Preview the agent correction</span>
+                <span className="prepare-copy">
+                  <strong>Fix this blocked claim</strong>
+                  <small>AI proposes. You approve.</small>
+                </span>
                 <span aria-hidden="true">→</span>
               </button>
             ) : (
@@ -1171,7 +1242,9 @@ export function ProofRailApp() {
         </div>
         <div className="cinematic-copy">
           <p>One sentence. One source. One hard stop.</p>
-          <h2 id="block-film-title">Claim enters. Proof fails. Gate closes.</h2>
+          <h2 id="block-film-title">
+            A website claim enters. The source disagrees. Publish stays locked.
+          </h2>
           <span>
             “800 launch teams” cannot pass when the source only proves 800
             waitlist sign-ups.
@@ -1463,7 +1536,10 @@ export function ProofRailApp() {
           ProofRail does not decide truth. It makes evidence gaps, revisions, and
           human decisions explicit before publication.
         </p>
-        <span>Local-first prototype · no account · no API key</span>
+        <span>
+          Local-first prototype · no account · no API key · cinematic media
+          AI-generated with Higgsfield · 3D artifact generated with Meshy
+        </span>
         </footer>
       </div>
 

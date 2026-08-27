@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ProofRail — CI for public claims",
+  title: "ProofRail — Pre-publication claim gate for marketing & PR",
   description:
-    "Turn draft claims and source packets into reviewable evidence decisions and a verifiable proof receipt.",
+    "Check claims in a company website, launch page, or report against evidence before publishing.",
   openGraph: {
-    title: "ProofRail — CI for public claims",
+    title: "ProofRail — Pre-publication claim gate for marketing & PR",
     description:
-      "The agent assembles the evidence. The human decides what may ship.",
+      "AI checks public claims against linked sources. A human approves. Publish stays locked until every claim clears.",
     type: "website",
     images: [
       {
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ProofRail — CI for public claims",
+    title: "ProofRail — Pre-publication claim gate for marketing & PR",
     description:
-      "The agent assembles the evidence. The human decides what may ship.",
+      "AI checks public claims against linked sources. A human approves. Publish stays locked until every claim clears.",
     images: ["/proofrail-social.png"],
   },
 };

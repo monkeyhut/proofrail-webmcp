@@ -1,13 +1,13 @@
 # ProofRail
 
-**CI for public claims.**
+**The pre-publication claim gate for marketing and PR teams.**
 
-ProofRail is not a news site or an AI writer. It is the release gate between a
-draft and the publish button. An agent inspects each public claim against its
-attached evidence and prepares the smallest defensible correction. A human is
-the only actor allowed to approve the final wording and its linked evidence.
-Until every claim clears the fixed rules, publication stays locked; a passing
-revision can be sealed into a JSON Proof Receipt with a SHA-256 content hash.
+ProofRail is not a news site or an AI writer. Before a company website, launch
+page, or report goes live, an agent inspects each factual claim against linked
+evidence and prepares the smallest defensible correction. A human is the only
+actor allowed to approve the final wording and evidence. Until every claim
+clears the fixed rules, Publish stays locked; a passing revision can be sealed
+into a JSON Proof Receipt with a SHA-256 content hash.
 
 > ProofRail does not decide truth. It makes evidence gaps, revisions, and human
 > decisions explicit before publication.
@@ -99,6 +99,8 @@ Individual checks:
 See [the trust model](docs/THREAT_MODEL.md) and
 [the submission kit](docs/CHALLENGE_SUBMISSION.md). Generated media provenance
 and licensing caveats are recorded in [the asset manifest](docs/ASSET_PROVENANCE.md).
+The live challenge gates are tracked in
+[the compliance matrix](docs/CHALLENGE_COMPLIANCE.md).
 
 ## License
 
