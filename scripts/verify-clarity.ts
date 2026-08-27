@@ -1,182 +1,144 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const source = readFileSync(new URL("../app/proofrail-app.tsx", import.meta.url), "utf8");
-const previewSource = readFileSync(
-  new URL("../app/publication-preview.tsx", import.meta.url),
-  "utf8",
-);
-const workflowSource = readFileSync(
-  new URL("../app/workflow-cinematic.tsx", import.meta.url),
-  "utf8",
-);
-const heroStart = source.indexOf('<section className="rail-hero"');
-const heroEnd = source.indexOf("{notice &&", heroStart);
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
-assert.ok(heroStart >= 0 && heroEnd > heroStart, "CLARITY_HERO_NOT_FOUND");
-
-const hero = source.slice(heroStart, heroEnd).toLowerCase().replace(/\s+/g, " ");
-
-const criteria = [
-  {
-    name: "target audience",
-    points: 20,
-    needles: ["pre-publication workspace", "marketing and pr", "not a news site"],
-  },
-  {
-    name: "input types",
-    points: 20,
-    needles: ["launch page", "case study", "article", "report"],
-  },
-  {
-    name: "agent job",
-    points: 20,
-    needles: ["ai checks", "source evidence", "stage a safer revision"],
-  },
-  {
-    name: "human authority",
-    points: 20,
-    needles: ["human makes the final call", "one human gate"],
-  },
-  {
-    name: "release condition",
-    points: 20,
-    needles: ["until then", "publishing stays locked"],
-  },
-] as const;
-
-const results = criteria.map((criterion) => {
-  const missing = criterion.needles.filter((needle) => !hero.includes(needle));
-  return {
-    name: criterion.name,
-    score: missing.length === 0 ? criterion.points : 0,
-    possible: criterion.points,
-    missing,
-  };
-});
-
-const score = results.reduce((sum, result) => sum + result.score, 0);
-const mobileActions = hero.indexOf('className="rail-hero__actions"'.toLowerCase());
-const definition = hero.indexOf('className="rail-definition"'.toLowerCase());
-
-assert.ok(
-  mobileActions > definition,
-  "CLARITY_MOBILE_ACTIONS_PRECEDE_PRODUCT_DEFINITION",
-);
-assert.ok(
-  hero.indexOf("<publicationpreview") >= 0 &&
-    hero.indexOf('classname="rail-preview-stage__evidence"') >= 0,
-  "CLARITY_PREVIEW_OR_SEPARATE_EVIDENCE_RAIL_MISSING",
-);
-assert.ok(
-  hero.indexOf("<publicationpreview") >= 0 &&
-    hero.indexOf("<publicationpreview") < hero.indexOf("</section>"),
-  "CLARITY_PREVIEW_NOT_INSIDE_OPENING_PRODUCT_STAGE",
-);
-for (const requiredPreviewPhrase of [
-  "Layout + art-direction simulation.",
-  "Preview only · publish locked",
-  "AI proposal",
-  "Human approved",
-]) {
-  assert.ok(
-    previewSource.includes(requiredPreviewPhrase),
-    `CLARITY_PREVIEW_PHRASE_MISSING: ${requiredPreviewPhrase}`,
-  );
+function read(relativePath: string): string {
+  const path = resolve(repoRoot, relativePath);
+  assert.ok(existsSync(path), `CLARITY_SOURCE_MISSING: ${relativePath}`);
+  return readFileSync(path, "utf8");
 }
+
+const emptyStudio = read("app/empty-studio.tsx");
+const reviewStudio = read("app/review-studio.tsx");
+const app = read("app/proofrail-app.tsx");
+const gate = read("app/release-readiness.tsx");
+const rendererFacade = read("app/publication-renderers/publication-canvas.tsx");
+
+type Criterion = {
+  name: string;
+  points: number;
+  pass: boolean;
+  evidence: string;
+};
+
+const firstView = emptyStudio.toLowerCase();
+const loadedView = reviewStudio.toLowerCase();
+
+const criteria: Criterion[] = [
+  {
+    name: "audience and moment",
+    points: 15,
+    pass:
+      firstView.includes("marketing + pr") &&
+      firstView.includes("before anything becomes public"),
+    evidence: "The first screen names marketing/PR and the pre-publication moment.",
+  },
+  {
+    name: "input and first action",
+    points: 15,
+    pass:
+      firstView.includes("import the publication you are preparing") &&
+      ["url", "text / html", "file", "brand assets"].every((item) =>
+        firstView.includes(item),
+      ),
+    evidence: "The primary action and accepted source categories are explicit.",
+  },
+  {
+    name: "output",
+    points: 15,
+    pass:
+      firstView.includes("renders") &&
+      ["launch", "case study", "article", "report"].every((item) =>
+        firstView.includes(item),
+      ) &&
+      loadedView.includes("publicationcanvas"),
+    evidence: "The copy promises a rendered publication and the loaded state uses the real canvas.",
+  },
+  {
+    name: "human authority difference",
+    points: 15,
+    pass:
+      firstView.includes("only the visible human review") &&
+      loadedView.includes("agent proposal / not approved") &&
+      loadedView.includes("human decision required"),
+    evidence: "Agent proposals and human decisions remain visibly different states.",
+  },
+  {
+    name: "tool-first workspace",
+    points: 15,
+    pass:
+      loadedView.includes("publication review workspace") &&
+      loadedView.includes("contextual review rail") &&
+      loadedView.includes("current source") &&
+      loadedView.includes("release candidate"),
+    evidence: "The loaded experience is a canvas/review-rail workspace with explicit authority tabs.",
+  },
+  {
+    name: "four structural renderers",
+    points: 10,
+    pass:
+      [
+        "launch-renderer.tsx",
+        "case-study-renderer.tsx",
+        "article-renderer.tsx",
+        "report-renderer.tsx",
+      ].every((file) => existsSync(resolve(repoRoot, "app/publication-renderers", file))) &&
+      ["LaunchRenderer", "CaseStudyRenderer", "ArticleRenderer", "ReportRenderer"].every(
+        (name) => rendererFacade.includes(name),
+      ),
+    evidence: "Four separate renderer modules are selected by a discriminated facade.",
+  },
+  {
+    name: "real release check",
+    points: 10,
+    pass:
+      app.includes("verifyReleaseGate(workspaceRef.current)") &&
+      gate.includes("await runReleaseCheck()") &&
+      gate.includes("setGate(nextGate)") &&
+      !/setTimeout|setInterval/.test(gate),
+    evidence: "Both visible check surfaces call the deterministic live gate; the detailed check has no timer.",
+  },
+  {
+    name: "no decorative media dependency",
+    points: 5,
+    pass:
+      !app.includes("<video") &&
+      !app.includes("model-viewer") &&
+      !reviewStudio.includes("<video") &&
+      !reviewStudio.includes("model-viewer"),
+    evidence: "The primary experience does not depend on cinematic or 3D decoration.",
+  },
+];
+
+const score = criteria.reduce(
+  (total, criterion) => total + (criterion.pass ? criterion.points : 0),
+  0,
+);
+const failed = criteria.filter((criterion) => !criterion.pass);
+
 assert.equal(
-  previewSource.includes("dangerouslySetInnerHTML"),
-  false,
-  "CLARITY_PREVIEW_MUST_RENDER_TEXT_NODES",
-);
-for (const publicationType of [
-  'projection.publicationType === "project-page"',
-  'projection.publicationType === "blog-post"',
-  'projection.publicationType === "launch-page"',
-  'projection.publicationType === "report"',
-]) {
-  assert.ok(
-    previewSource.includes(publicationType),
-    `CLARITY_TYPE_AWARE_PREVIEW_MISSING: ${publicationType}`,
-  );
-}
-assert.equal(source.includes("<CinematicVideo"), false, "CLARITY_UNRELATED_VIDEO_PRESENT");
-assert.equal(source.includes("<DeferredProofArtifact"), false, "CLARITY_UNRELATED_3D_PRESENT");
-assert.ok(
-  source.includes("gateStatus={gate.status}") &&
-    source.includes("blockerCount={gate.blockers.length}") &&
-    source.includes("evidenceMapped={evidenceMapped}"),
-  "CLARITY_WORKFLOW_MEDIA_MUST_BIND_TO_REAL_GATE",
-);
-assert.ok(
-  source.includes("workspace.claims.every((claim)") &&
-    workflowSource.includes('data-state={evidenceMapped ? "complete" : "pending"}') &&
-    workflowSource.includes("Evidence incomplete"),
-  "CLARITY_EVIDENCE_STEP_MUST_REFLECT_COMPLETE_EDGE_COVERAGE",
-);
-assert.ok(
-  workflowSource.includes('const gatePassed = gateStatus === "pass"') &&
-    workflowSource.includes("stopped at the human gate"),
-  "CLARITY_CINEMATIC_MUST_FAIL_CLOSED_AT_HUMAN_GATE",
-);
-assert.equal(
-  workflowSource.includes("release-ready receipt"),
-  false,
-  "CLARITY_GATE_PASS_MUST_NOT_PRETEND_RECEIPT_EXISTS",
-);
-assert.ok(
-  workflowSource.includes("It never changes claims") &&
-    workflowSource.includes("the release gate") &&
-    workflowSource.includes("or the receipt"),
-  "CLARITY_CINEMATIC_MUST_DISCLOSE_NON_MUTATING_CONCEPT_MEDIA",
-);
-assert.ok(
-  workflowSource.includes("prefers-reduced-motion: reduce"),
-  "CLARITY_CINEMATIC_REDUCED_MOTION_MISSING",
-);
-assert.equal(
-  workflowSource.includes("<video"),
-  false,
-  "CLARITY_UNREVIEWED_VIDEO_RUNTIME_PRESENT",
-);
-assert.equal(
-  workflowSource.includes("<model-viewer"),
-  false,
-  "CLARITY_UNREVIEWED_3D_RUNTIME_PRESENT",
-);
-assert.equal(
-  previewSource.includes("proofrail-workflow-") ||
-    previewSource.includes("proofrail-evidence-dossier-"),
-  false,
-  "CLARITY_CONCEPT_MEDIA_MUST_NOT_IMPLY_CUSTOMER_PUBLICATION_ASSETS",
-);
-assert.equal(
-  previewSource.includes("paragraphs.slice(0,"),
-  false,
-  "CLARITY_COMPACT_PREVIEW_MUST_KEEP_COMPLETE_BODY_SCROLLABLE",
-);
-assert.equal(
-  previewSource.includes("workspace.evidence"),
-  false,
-  "CLARITY_INTERNAL_EVIDENCE_MUST_NOT_LEAK_INTO_PUBLIC_PREVIEW",
-);
-assert.equal(
-  previewSource.includes('"72%"'),
-  false,
-  "CLARITY_PREVIEW_MUST_NOT_INVENT_CHART_VALUES",
-);
-assert.equal(
-  previewSource.includes("profile.methodology") ||
-    previewSource.includes("heroAssetCaption"),
-  false,
-  "CLARITY_UNSCOPED_PUBLIC_PROSE_MUST_NOT_BYPASS_CLAIM_GATE",
-);
-assert.equal(
-  previewSource.includes("<strong>{projection.title}</strong>"),
-  false,
-  "CLARITY_INTERNAL_PACKET_TITLE_MUST_NOT_APPEAR_AS_PUBLIC_COPY",
+  failed.length,
+  0,
+  `CLARITY_CRITERIA_FAILED: ${failed.map((item) => item.name).join(", ")}`,
 );
 assert.ok(score >= 90, `CLARITY_SCORE_TOO_LOW: ${score}/100`);
+
+for (const obsoletePath of [
+  "app/publication-preview.tsx",
+  "app/workflow-cinematic.tsx",
+  "public/media/proofrail-block.mp4",
+  "public/media/proofrail-release.mp4",
+  "public/media/proofrail-evidence-core.glb",
+]) {
+  assert.equal(
+    existsSync(resolve(repoRoot, obsoletePath)),
+    false,
+    `OBSOLETE_RUNTIME_PRESENT: ${obsoletePath}`,
+  );
+}
 
 console.log(
   JSON.stringify(
@@ -184,9 +146,14 @@ console.log(
       status: "pass",
       score,
       threshold: 90,
-      results,
-      rubric:
-        "Source-level clarity heuristic: audience, publication inputs, live preview, AI role, human authority, publish condition",
+      criteria: criteria.map(({ name, points, pass, evidence }) => ({
+        name,
+        score: pass ? points : 0,
+        possible: points,
+        evidence,
+      })),
+      limitation:
+        "This is a deterministic source-contract check. Independent people and browser evidence remain separate gauntlet gates.",
     },
     null,
     2,

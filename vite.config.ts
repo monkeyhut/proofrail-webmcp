@@ -50,7 +50,9 @@ export default defineConfig(async () => {
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
-      vinext(),
+      // The local production server and static hosts can serve hashed assets
+      // without making CSS/JS compete uncompressed on the critical path.
+      vinext({ precompress: true }),
       sites(),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },

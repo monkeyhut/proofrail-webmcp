@@ -1,124 +1,154 @@
-# Publication preview research
+# Publication renderer research and design contract
 
-Research date: 2026-08-27
+Research record: 2026-08-27
 
-This note records the visual and information-architecture research behind
-ProofRail's type-aware publication preview. It is a design reference, not a
-claim that ProofRail copies any source implementation.
+This note records the structural ideas behind ProofRail's four publication
+renderers. It is not a claim that ProofRail copies another site's code, assets,
+motion, prompts, or brand identity.
 
 ## Core finding
 
-There is no universal "premium company page." The appropriate layout depends
-on the publication's job and the assets the company actually owns:
+There is no universal premium publication template. A page becomes credible
+when its hierarchy follows the communication job and uses only material the
+publisher actually supplied.
 
-| Communication job | What strong companies foreground | ProofRail renderer |
+| Publication type | Primary reader question | Required composition |
 | --- | --- | --- |
-| Product launch | Product or interface, one thesis, availability, CTA, supported performance | Split product hero, supplied asset or typographic fallback, factual benefit modules |
-| Project / case study | Client, outcome, real work, early facts or KPIs, scope, narrative | Full-bleed case cover, fact strip, outcome and story sections |
-| Blog / journal | Publication identity, category, headline/deck, author, date, readable article | Editorial masthead, lead composition, byline, 60-72ch reading column |
-| Research report | Institution, date/version, abstract, key findings, contents, exhibits, method | Formal cover, contents, finding module, source register |
+| Product launch | What changed, why does it matter, and how can I access it? | Outcome-led hero, real product/UI if supplied, differentiator, benefits, demonstrations, use cases, sourced proof, availability, focused CTA |
+| Case study | What changed, how was it achieved, and what proves the outcome? | Transformation cover, client/project facts, challenge, insight, approach, system in use, process, sourced outcomes, quote, credits |
+| Editorial article | What is the thesis, who wrote it, and how can I follow the argument? | Category, headline, deck, byline/date, hero media, readable chapters, pull quotes, captions, references, related material |
+| Report | What are the findings, how were they derived, and what are the limits? | Formal cover, executive summary, numbered findings, navigation, metrics/charts with context, methodology, caveats, sources, archive/download material |
 
-The public preview must be a clean audience-facing page. Claim markers and
-review actions belong to a separate proof layer, never permanently inside the
-published design.
+The clean publication canvas and the proof overlay are separate surfaces. Claim
+markers, evidence state, proposals, blockers, and decisions belong to the review
+layer, not permanently inside the audience-facing design.
 
-## Primary-source reference set
+## Reference set
 
-### Launch and product storytelling
+References are studied for information structure, rhythm, media function, and
+interaction only.
 
-- [Apple MacBook Pro](https://www.apple.com/macbook-pro/): the real product and
-  a short claim dominate; 3D/film is justified because the product itself is
-  physical.
-- [Figma Make launch](https://www.figma.com/blog/introducing-figma-make/):
-  editorial launch structure followed immediately by real product UI.
-- [Linear Next](https://linear.app/next): sparse, thesis-led campaign
-  storytelling and restrained typographic motion.
-- [Vercel Agent launch](https://vercel.com/blog/introducing-vercel-agent):
-  technical launch with concise metadata, audience, availability and real
-  workflows.
-- [Anthropic product news](https://www.anthropic.com/news/claude-design-anthropic-labs):
-  warm corporate editorial design with owned artwork and concrete examples.
+### Product launch
 
-### Project and case-study storytelling
+- [Apple MacBook Pro](https://www.apple.com/macbook-pro/)
+- [Linear Loops](https://linear.app/now/introducing-loops)
+- [Figma Make](https://www.figma.com/blog/introducing-figma-make/)
+- [Vercel Agent](https://vercel.com/blog/vercel-agent)
 
-- [Stripe x Anthropic](https://stripe.com/customers/anthropic): outcome-led
-  title, early KPI rail, product facts and quotes.
-- [Linear x OpenAI](https://linear.app/customers/openai): outcome headline,
-  branded lead visual and an early context/facts row.
-- [Webflow x Purpose Brands](https://webflow.com/customers/purpose-brands):
-  split hero, real site medium, results and executive quote.
-- [Pentagram Scenario](https://www.pentagram.com/work/scenario): minimal
-  metadata followed by the actual creative work at large scale.
+### Case study
 
-### Editorial, newsroom and research
+- [BASIC/DEPT® Cowboy](https://basicagency.com/case-studies/cowboy)
+- [Instrument Levi's](https://www.instrument.com/work/levis)
+- [Stripe customer story: Anthropic](https://stripe.com/customers/anthropic)
 
-- [Linear Now](https://linear.app/now), [Notion Blog](https://www.notion.com/en-us/blog),
-  [Stripe Newsroom](https://stripe.com/newsroom), [Apple Newsroom](https://www.apple.com/newsroom/),
-  [Patagonia Stories](https://www.patagonia.com/stories/all/) and
-  [Airbnb Newsroom](https://news.airbnb.com/) informed category, author,
-  date, press-utility and long-form reading patterns.
-- [WEF Future of Jobs](https://www.weforum.org/publications/the-future-of-jobs-report-2025/),
-  [McKinsey State of AI](https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai?lang=en),
-  [GitHub Octoverse](https://github.blog/news-insights/octoverse/octoverse-a-new-developer-joins-github-every-second-as-ai-leads-typescript-to-1/),
-  [Microsoft Annual Report](https://www.microsoft.com/investor/reports/ar25/index.html)
-  and [Spotify Loud & Clear](https://loudandclear.byspotify.com/) informed
-  report covers, key findings, exhibits, navigation, methodology and caveats.
+### Editorial
 
-## MotionSites member-library review
+- [Spotify newsroom](https://newsroom.spotify.com/)
+- [Google Design](https://design.google/library/)
 
-The signed-in MotionSites member library was inspected read-only. No prompt,
-source code or media was copied or hotlinked.
+### Report
 
-- Blog Showcase informed the large editorial lead and publication masthead.
-- LaunchEx About and Submissions informed asymmetric project/report layouts.
-- NexaCore Control and Process informed the real claim-to-source system logic.
-- Email Landing Page informed the controlled draft-to-publication match cut.
-- Urban Jungle informed the project renderer's image-first editorial scale.
+- [Spotify Loud & Clear](https://loudandclear.byspotify.com/)
+- [GitHub Octoverse](https://github.blog/news-insights/octoverse/)
+- [Stripe annual updates](https://stripe.com/annual-updates/2025)
+- [World Economic Forum: Future of Jobs](https://www.weforum.org/publications/the-future-of-jobs-report-2025/)
+- [Microsoft Annual Report](https://www.microsoft.com/investor/reports/)
 
-MotionSites Systema is no longer used as a universal visual template. A single
-black card skeleton made all publication types look like the same internal
-tool. The outer ProofRail shell may carry a consistent product language, while
-each public renderer keeps its own information architecture.
+### Product workspace and motion
 
-## Implemented design contract
+- [Linear](https://linear.app/)
+- [Stripe](https://stripe.com/)
+- [Raycast](https://www.raycast.com/)
+- [Apple Human Interface Guidelines: Motion](https://developer.apple.com/design/human-interface-guidelines/motion)
+- [W3C: Animation from interactions](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html)
 
-- The publication occupies roughly 60 percent of the desktop opening view and
-  remains readable rather than appearing as a miniature browser card.
-- Format switching changes DOM structure, typography and media logic, not only
-  color.
-- Four art directions are available: precision tech, editorial human,
-  institutional and bold consumer.
-- Import captures brand, industry, audience, author/institution, date/version,
-  CTA, type-specific subject or client, and—where the renderer uses it—an
-  optional real hero image with descriptive alt text and focal point.
-- If no real asset is supplied, ProofRail uses an explicitly disclosed
-  typographic art-direction fallback. It does not invent a product photo,
-  customer logo, quote or KPI.
-- Quantitative presentation is fail-closed: a value appears only when it is
-  present verbatim with its unit in the public copy. A chart appears only for a
-  bounded percentage; missing metrics produce narrative composition, not a
-  fabricated number or bar.
-- Internal evidence records never render in the clean public report. Longer
-  public prose such as methodology or image captions is deliberately not a
-  profile field in this challenge build: it must enter the headline/body claim
-  map before ProofRail may render and seal it.
-- Public page and proof overlay are separate modes. Switching to proof uses a
-  controlled rail wipe and exposes exact claim states.
-- Motion represents real state changes: hero reveal, format match cut and
-  proof-layer reveal. It never suggests that approval or publishing happened.
-- Reduced-motion users receive the same information without those animations.
-- Generated workflow frames and the Meshy dossier study live only in the
-  ProofRail method section. They never enter a simulated customer publication,
-  because doing so would imply that the customer supplied or approved assets
-  they do not own.
+MotionSites was consulted only as a read-only reference library for dramaturgy
+and transition ideas. No proprietary prompt, source code, hosted medium,
+complete template, or third-party identity may be copied or hotlinked.
 
-## Rejected patterns
+## `PublicationBrief` contract
 
-- Generic orb, chrome ring, particle field, glassmorphism or unrelated 3D
-  "evidence core."
-- Fake KPI cards, invented customer marks, invented product imagery or charts
-  based on numbers that are not present in the draft/evidence.
-- Permanent audit badges embedded in the clean public page.
-- One beige/black document card relabeled as launch, project, blog and report.
-- Cinematic video inside a report or newsroom when it is not an authentic
-  publication asset.
+The model is discriminated by `launch`, `case-study`, `article`, or `report`.
+Every public field is either:
+
+- `provided`, with one or more provenance identifiers; or
+- `missing`, with a reason and an explicit request for human input.
+
+An empty string, empty array, decorative placeholder, generated customer fact,
+or inferred KPI is not a valid substitute for missing data.
+
+Shared concerns include organization, title, deck, sections, brand tokens,
+media, claims, sources, revisions, human decisions, release status, provenance,
+and accessibility metadata. Type-specific fields then determine each
+renderer’s hierarchy.
+
+Generated media has its own provenance and review state. A release candidate
+must reject generated assets that are still awaiting human review or were
+rejected.
+
+## Four independent composition systems
+
+### Launch
+
+- Product/outcome thesis opens the page.
+- Supplied product UI or media receives primary scale.
+- Benefits, feature demonstrations, use cases, sourced metrics,
+  specifications, access, and CTA follow in a decision-oriented sequence.
+- Missing product media remains an explicit media request, not generated fake
+  UI.
+
+### Case study
+
+- Transformation and project identity lead.
+- Client, scope, and roles form an editorial fact system.
+- Challenge, insight, approach, implementation, system in use, outcomes,
+  sourced metrics, testimony, gallery, and credits build the narrative.
+- Missing outcomes or testimony do not become anonymous praise.
+
+### Article
+
+- Publication identity, category, headline, deck, byline, and date establish
+  editorial context.
+- A readable long-form column, media captions, quotes, interview/timeline
+  modules, references, and related content support the argument.
+- Reading time, author, and date remain missing when not supplied.
+
+### Report
+
+- Institution, edition, thesis, and executive summary establish authority.
+- Numbered findings pair metrics and charts with context.
+- Contents, explorer/comparison, methodology, limitations, sources, FAQ, and
+  download/archive metadata support verification and reuse.
+- A chart is never generated merely because a number exists in nearby prose.
+
+## Media and motion decision
+
+The renderer system must work without new generated media. The active product
+uses no cinematic video or 3D runtime. Higgsfield and Meshy were retired because
+their explored directions did not communicate the product state faster or more
+accurately than the live 2D interface.
+
+Motion is reserved for causal transitions:
+
+- selected sentence → extracted claim;
+- claim → linked source passage;
+- current source → proposed direction;
+- blocker focus;
+- explicit human decision;
+- blocked → ready after the real gate changes state.
+
+Motion must never simulate analysis, approval, publishing, or receipt creation.
+Reduced-motion mode preserves the complete workflow through immediate state
+changes.
+
+## Acceptance evidence
+
+The renderer contract is not accepted by documentation alone. The current local
+record includes separate desktop/mobile expanded-canvas captures for all four
+types, separate DOM/CSS implementations, missing-field domain cases,
+proof-overlay and gate behavior, keyboard/focus checks, reduced-motion E2E,
+three-engine/eight-viewport accessibility checks, and representative loaded
+performance evidence. See `docs/qa/` and `docs/submission-assets/renderers/`.
+
+This remains local evidence. A final public submission should repeat critical
+checks against the exact deployed revision and judge-equivalent browser.

@@ -42,6 +42,7 @@ export type ReviewClaim = {
   risk: "low" | "medium" | "high";
   revision: number;
   humanApproval: HumanApproval;
+  previewTargetId?: string;
   proposal?: ResolutionProposal;
 };
 
@@ -107,7 +108,8 @@ export type ProofReceipt = {
   sourceWorkspaceRevision: number;
   contentHash: string;
   publicationType: PublicationType;
-  previewTemplateVersion: 2;
+  previewTemplateVersion: 3;
+  publicationBrief: PublicationBrief;
   title: string;
   headline: string;
   finalText: string;
@@ -141,7 +143,12 @@ export type Workspace = {
   evidence: EvidenceRecord[];
   edges: EvidenceEdge[];
   audit: AuditEvent[];
+  /** Immutable imported source used by the Current Source view. */
+  sourcePublicationBrief?: PublicationBrief;
+  /** Human-accepted working candidate; never substitutes for the source snapshot. */
+  publicationBrief?: PublicationBrief;
   receipt?: ProofReceipt;
+  invalidatedReceipt?: ProofReceipt;
 };
 
 export type AttachEvidenceInput = {
@@ -165,8 +172,10 @@ export type ReplacePacketInput = {
     location: ClaimLocation;
     text: string;
     risk: ReviewClaim["risk"];
+    previewTargetId?: string;
   }>;
   expectedWorkspaceRevision: number;
+  publicationBrief?: PublicationBrief;
 };
 
 export type StageResolutionInput = {
@@ -176,93 +185,115 @@ export type StageResolutionInput = {
   expectedClaimRevision: number;
 };
 
+export type DecideProposalInput = {
+  claimId: string;
+  decision: "approve" | "reject";
+  expectedWorkspaceRevision: number;
+  expectedClaimRevision: number;
+  expectedProposalId: string;
+};
+
+export type ApproveClaimEvidenceInput = {
+  claimId: string;
+  expectedWorkspaceRevision: number;
+  expectedClaimRevision: number;
+};
+
 const PARAGRAPH_BREAK_PATTERN = /\r?\n[\t ]*\r?\n|\u2029/;
 
-const DEMO_NOW = "2026-08-27T08:00:00.000Z";
+const SELF_DEMO_NOW = "2026-08-27T08:00:00.000Z";
 
 const initialClaims: ReviewClaim[] = [
   {
     id: "claim-01",
     number: "01",
     location: "headline",
-    text: "Northstar reduces launch handoff time by 42%.",
-    originalText: "Northstar reduces launch handoff time by 42%.",
-    state: "qualified",
-    label: "Needs qualifier",
+    text: "ProofRail keeps public claims locked until a human approves the final wording.",
+    originalText:
+      "ProofRail keeps public claims locked until a human approves the final wording.",
+    state: "supported",
+    label: "Evidence linked",
     risk: "high",
     revision: 1,
     humanApproval: "pending",
+    previewTargetId: "title",
   },
   {
     id: "claim-02",
     number: "02",
     location: "body",
-    text: "Every workspace stays encrypted in transit.",
-    originalText: "Every workspace stays encrypted in transit.",
+    text: "Agents can attach typed evidence and stage narrower wording without approving it.",
+    originalText:
+      "Agents can attach typed evidence and stage narrower wording without approving it.",
     state: "supported",
     label: "Supported",
     risk: "high",
     revision: 1,
     humanApproval: "approved",
+    previewTargetId: "section:self-demo-evidence",
   },
   {
     id: "claim-03",
     number: "03",
     location: "body",
-    text: "Teams can export an evidence packet without an account.",
-    originalText: "Teams can export an evidence packet without an account.",
+    text: "Six WebMCP tools share the live review workspace.",
+    originalText: "Six WebMCP tools share the live review workspace.",
     state: "supported",
     label: "Supported",
     risk: "medium",
     revision: 1,
     humanApproval: "approved",
+    previewTargetId: "section:self-demo-evidence",
   },
   {
     id: "claim-04",
     number: "04",
     location: "body",
-    text: "Trusted by 800 launch teams.",
-    originalText: "Trusted by 800 launch teams.",
-    state: "contradicted",
-    label: "Contradicted + stale",
+    text:
+      "A passing receipt seals the publication text, evidence matrix, human decisions, revision, and SHA-256 content hash.",
+    originalText:
+      "A passing receipt seals the publication text, evidence matrix, human decisions, revision, and SHA-256 content hash.",
+    state: "supported",
+    label: "Evidence linked",
     risk: "high",
     revision: 1,
     humanApproval: "pending",
+    previewTargetId: "release",
   },
 ];
 
 const initialEvidence: EvidenceRecord[] = [
   {
     id: "evidence-01",
-    title: "Pilot operations report",
-    sourceType: "internal-study",
-    publishedAt: "2026-08-18",
+    title: "Human approval boundary",
+    sourceType: "engineering-control",
+    publishedAt: "2026-08-27",
     excerpt:
-      "Median handoff time fell from 31 to 18 minutes across eight participating launch teams.",
+      "The release gate rejects supported wording until humanApproval is explicitly recorded as approved.",
   },
   {
     id: "evidence-02",
-    title: "Transport security architecture",
+    title: "WebMCP mutation contract",
     sourceType: "engineering-control",
-    publishedAt: "2026-08-21",
+    publishedAt: "2026-08-27",
     excerpt:
-      "All browser-to-service and service-to-service traffic is required to negotiate TLS 1.3.",
+      "Agent tools can attach evidence and stage revisions; no registered tool can approve a human decision.",
   },
   {
     id: "evidence-03",
-    title: "Anonymous export acceptance test",
+    title: "Registered tool manifest",
     sourceType: "product-test",
-    publishedAt: "2026-08-24",
+    publishedAt: "2026-08-27",
     excerpt:
-      "A signed-out visitor exported the complete evidence packet from the public review route.",
+      "The browser registers exactly six tools against the same in-memory workspace rendered by the interface.",
   },
   {
     id: "evidence-04",
-    title: "Waitlist snapshot",
-    sourceType: "archive",
-    publishedAt: "2024-11-03",
+    title: "Proof receipt implementation",
+    sourceType: "engineering-control",
+    publishedAt: "2026-08-27",
     excerpt:
-      "The file records 800 individual waitlist sign-ups. It does not identify active teams or customers.",
+      "Receipt creation serializes publication content, evidence relationships, the human audit trail, and the source revision before calculating SHA-256.",
   },
 ];
 
@@ -271,30 +302,30 @@ const initialEdges: EvidenceEdge[] = [
     id: "edge-01",
     claimId: "claim-01",
     evidenceId: "evidence-01",
-    relation: "qualifies",
-    rationale: "The measured reduction is supported, but only for an eight-team pilot.",
+    relation: "supports",
+    rationale: "The deterministic gate directly enforces the visible human approval boundary.",
   },
   {
     id: "edge-02",
     claimId: "claim-02",
     evidenceId: "evidence-02",
     relation: "supports",
-    rationale: "The architecture control directly covers transport encryption.",
+    rationale: "The mutation surface deliberately excludes human approval actions.",
   },
   {
     id: "edge-03",
     claimId: "claim-03",
     evidenceId: "evidence-03",
     relation: "supports",
-    rationale: "The signed-out acceptance path demonstrates anonymous export.",
+    rationale: "The registered manifest and browser test establish the six-tool boundary.",
   },
   {
     id: "edge-04",
     claimId: "claim-04",
     evidenceId: "evidence-04",
-    relation: "contradicts",
+    relation: "supports",
     rationale:
-      "The source counts people on a 2024 waitlist, not current teams or customers.",
+      "The receipt implementation binds each named field before hashing the stable payload.",
   },
 ];
 
@@ -304,38 +335,68 @@ export const demoResolutions: Record<
 > = {
   "claim-01": {
     revisedText:
-      "In an eight-team pilot, Northstar reduced median launch handoff time by 42%.",
+      "ProofRail keeps public claims locked until a human approves the exact final wording.",
     rationale:
-      "Preserve the measured result while adding the sample and pilot boundary.",
+      "Make the human authority boundary explicit without expanding the product claim.",
   },
   "claim-04": {
-    revisedText: "Joined by 800 people on the 2024 Northstar waitlist.",
+    revisedText:
+      "A passing ProofRail receipt seals the publication text, evidence matrix, human decisions, revision, and SHA-256 content hash.",
     rationale:
-      "Replace the unsupported customer claim with the exact population and date in the source.",
+      "Name the receipt owner while preserving the exact fields covered by the implementation record.",
   },
 };
 
-export function createDemoWorkspace(): Workspace {
+export function createEmptyWorkspace(): Workspace {
   return {
-    id: "workspace-northstar",
+    id: "workspace-empty",
     publicationType: "launch-page",
-    title: "Northstar launch brief",
-    headline: "Northstar reduces launch handoff time by 42%.",
+    title: "",
+    headline: "",
+    draftText: "",
+    revision: 1,
+    claims: [],
+    evidence: [],
+    edges: [],
+    audit: [
+      {
+        id: "audit-01",
+        at: SELF_DEMO_NOW,
+        actor: "system",
+        action: "WORKSPACE_OPENED",
+        detail: "Empty review workspace opened. No publication has been imported.",
+        workspaceRevision: 1,
+      },
+    ],
+  };
+}
+
+export function createProofRailSelfDemoWorkspace(): Workspace {
+  const publicationBrief = createProofRailSelfDemoBrief();
+  return {
+    id: "workspace-proofrail-self-demo",
+    publicationType: "launch-page",
+    title: "ProofRail self-demo · release contract",
+    headline:
+      "ProofRail keeps public claims locked until a human approves the final wording.",
     draftText: [
-      "Every workspace stays encrypted in transit. Teams can export an evidence packet without an account.",
-      "Trusted by 800 launch teams.",
+      "Agents can attach typed evidence and stage narrower wording without approving it. Six WebMCP tools share the live review workspace.",
+      "A passing receipt seals the publication text, evidence matrix, human decisions, revision, and SHA-256 content hash.",
     ].join("\n\n"),
     revision: 7,
     claims: structuredClone(initialClaims),
     evidence: structuredClone(initialEvidence),
     edges: structuredClone(initialEdges),
+    sourcePublicationBrief: structuredClone(publicationBrief),
+    publicationBrief,
     audit: [
       {
         id: "audit-01",
-        at: DEMO_NOW,
+        at: SELF_DEMO_NOW,
         actor: "system",
-        action: "PACKET_IMPORTED",
-        detail: "Draft and four source records loaded into the review workspace.",
+        action: "SELF_DEMO_LOADED",
+        detail:
+          "ProofRail's own release contract and repository-backed evidence were loaded as an explicitly labelled self-demo.",
         workspaceRevision: 6,
       },
       {
@@ -343,7 +404,7 @@ export function createDemoWorkspace(): Workspace {
         at: "2026-08-27T08:01:00.000Z",
         actor: "agent",
         action: "EVIDENCE_GRAPH_BUILT",
-        detail: "Four atomic claims linked to four typed evidence relationships.",
+        detail: "Four product-contract claims were linked to four implementation records.",
         workspaceRevision: 7,
       },
       {
@@ -351,11 +412,16 @@ export function createDemoWorkspace(): Workspace {
         at: "2026-08-27T08:02:00.000Z",
         actor: "human",
         action: "SUPPORTED_CLAIMS_APPROVED",
-        detail: "Human review approved the linked evidence for claim-02 and claim-03.",
+        detail:
+          "Human review approved claim-02 and claim-03; claim-01 and claim-04 remain pending for the demo.",
         workspaceRevision: 7,
       },
     ],
   };
+}
+
+export function createDemoWorkspace(): Workspace {
+  return createProofRailSelfDemoWorkspace();
 }
 
 export function changePublicationType(
@@ -364,10 +430,26 @@ export function changePublicationType(
 ): Workspace {
   if (workspace.publicationType === publicationType) return workspace;
 
+  const publicationBrief = createSourceOnlyPublicationBrief({
+    publicationType,
+    title: workspace.title,
+    headline: workspace.headline,
+    body: workspace.draftText,
+  });
+
   return {
     ...workspace,
+    id: `workspace-active-review-r${workspace.revision + 1}`,
     publicationType,
+    sourcePublicationBrief: structuredClone(publicationBrief),
+    publicationBrief,
     revision: workspace.revision + 1,
+    claims: workspace.claims.map((claim) => ({
+      ...claim,
+      humanApproval: "pending" as const,
+      revision: claim.revision + 1,
+    })),
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
     audit: [
       ...workspace.audit,
@@ -562,18 +644,30 @@ export function stageResolutionBatch(
     revision: workspace.revision + 1,
     claims: nextClaims,
     audit: [...workspace.audit, event],
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
   };
 }
 
 export function decideProposal(
   workspace: Workspace,
-  claimId: string,
-  decision: "approve" | "reject",
+  input: DecideProposalInput,
 ): Workspace {
+  assertExpectedRevision(workspace, input.expectedWorkspaceRevision);
+  const { claimId, decision } = input;
   const claim = getClaim(workspace, claimId);
+  if (claim.revision !== input.expectedClaimRevision) {
+    throw new Error(
+      `STALE_CLAIM: ${claimId} expected revision ${input.expectedClaimRevision}, current revision is ${claim.revision}.`,
+    );
+  }
   if (!claim.proposal || claim.proposal.status !== "staged") {
     throw new Error(`NO_STAGED_PROPOSAL: ${claimId}`);
+  }
+  if (claim.proposal.id !== input.expectedProposalId) {
+    throw new Error(
+      `STALE_PROPOSAL: ${claimId} expected ${input.expectedProposalId}, current proposal is ${claim.proposal.id}.`,
+    );
   }
 
   const approved = decision === "approve";
@@ -603,6 +697,21 @@ export function decideProposal(
       : workspace.draftText;
   assertPublicationCoverage(nextHeadline, nextDraftText, nextClaims);
 
+  let nextPublicationBrief = workspace.publicationBrief;
+  if (approved && nextPublicationBrief) {
+    if (!claim.previewTargetId) {
+      throw new Error(
+        `MISSING_PREVIEW_TARGET: ${claimId} cannot update the release candidate without an exact renderer target.`,
+      );
+    }
+    nextPublicationBrief = replacePublicationBriefClaim(
+      nextPublicationBrief,
+      claim.previewTargetId,
+      claim.text,
+      claim.proposal.after,
+    );
+  }
+
   const event = auditEvent(
     workspace,
     "human",
@@ -617,28 +726,40 @@ export function decideProposal(
     revision: workspace.revision + 1,
     headline: nextHeadline,
     draftText: nextDraftText,
+    publicationBrief: nextPublicationBrief,
     claims: nextClaims,
     audit: [...workspace.audit, event],
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
   };
 }
 
 export function approveClaimEvidence(
   workspace: Workspace,
-  claimId: string,
+  input: ApproveClaimEvidenceInput,
 ): Workspace {
+  assertExpectedRevision(workspace, input.expectedWorkspaceRevision);
+  const { claimId } = input;
   const claim = getClaim(workspace, claimId);
+  if (claim.revision !== input.expectedClaimRevision) {
+    throw new Error(
+      `STALE_CLAIM: ${claimId} expected revision ${input.expectedClaimRevision}, current revision is ${claim.revision}.`,
+    );
+  }
   if (claim.proposal?.status === "staged") {
     throw new Error(`HUMAN_REVIEW_PENDING: ${claimId} has a staged language change.`);
   }
-  if (claim.state !== "supported") {
+  if (claim.state !== "supported" && claim.state !== "resolved") {
     throw new Error(
-      `EVIDENCE_NOT_SUPPORTING: ${claimId} is ${claim.state}, not supported.`,
+      `EVIDENCE_NOT_SUPPORTING: ${claimId} is ${claim.state}, not supported or human-resolved.`,
     );
   }
 
   const supportEdges = workspace.edges.filter(
-    (edge) => edge.claimId === claimId && edge.relation === "supports",
+    (edge) =>
+      edge.claimId === claimId &&
+      (edge.relation === "supports" ||
+        (claim.state === "resolved" && edge.relation === "qualifies")),
   );
   if (supportEdges.length === 0) {
     throw new Error(`NO_SUPPORTING_EDGE: ${claimId}`);
@@ -670,6 +791,7 @@ export function approveClaimEvidence(
         : candidate,
     ),
     audit: [...workspace.audit, event],
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
   };
 }
@@ -772,6 +894,7 @@ export function attachEvidence(
     edges: nextEdges,
     claims: nextClaims,
     audit: [...workspace.audit, event],
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
   };
 }
@@ -779,6 +902,7 @@ export function attachEvidence(
 export function replaceReviewPacket(
   workspace: Workspace,
   input: ReplacePacketInput,
+  actor: Extract<Actor, "agent" | "human"> = "agent",
 ): Workspace {
   assertExpectedRevision(workspace, input.expectedWorkspaceRevision);
   const title = input.title.trim();
@@ -800,7 +924,7 @@ export function replaceReviewPacket(
   if (draftText.length < 40 || draftText.length > 8000) {
     throw new Error("INVALID_DRAFT_LENGTH");
   }
-  if (input.claims.length < 1 || input.claims.length > 12) {
+  if (input.claims.length < 1 || input.claims.length > 49) {
     throw new Error("INVALID_CLAIM_COUNT");
   }
 
@@ -815,6 +939,12 @@ export function replaceReviewPacket(
     }
     if (!(["low", "medium", "high"] as const).includes(candidate.risk)) {
       throw new Error(`INVALID_CLAIM_RISK: claim ${index + 1}`);
+    }
+    if (
+      candidate.previewTargetId &&
+      !/^[a-z0-9][a-z0-9:-]{0,119}$/i.test(candidate.previewTargetId)
+    ) {
+      throw new Error(`INVALID_PREVIEW_TARGET: claim ${index + 1}`);
     }
     const publicationField = candidate.location === "headline" ? headline : draftText;
     const firstOccurrence = publicationField.indexOf(text);
@@ -844,20 +974,52 @@ export function replaceReviewPacket(
       risk: candidate.risk,
       revision: 1,
       humanApproval: "pending",
+      previewTargetId:
+        candidate.previewTargetId ??
+        (candidate.location === "headline"
+          ? input.publicationType === "blog-post"
+            ? "headline"
+            : "title"
+          : "section:source-publication-body"),
     };
   });
 
   assertPublicationCoverage(headline, draftText, claims);
 
+  const publicationBrief =
+    input.publicationBrief ??
+    createSourceOnlyPublicationBrief({
+      publicationType: input.publicationType,
+      title,
+      headline,
+      body: draftText,
+      sourceActor: actor,
+    });
+  validatePublicationBrief(publicationBrief);
+  const expectedBriefType: PublicationBrief["publicationType"] =
+    input.publicationType === "launch-page"
+      ? "launch"
+      : input.publicationType === "project-page"
+        ? "case-study"
+        : input.publicationType === "blog-post"
+          ? "article"
+          : "report";
+  if (publicationBrief.publicationType !== expectedBriefType) {
+    throw new Error(
+      `PUBLICATION_BRIEF_TYPE_MISMATCH: ${input.publicationType} requires ${expectedBriefType}.`,
+    );
+  }
+
   const event = auditEvent(
     workspace,
-    "agent",
+    actor,
     "PACKET_REPLACED",
     `Replaced the workspace with “${title}” and ${claims.length} atomic claim(s).`,
   );
 
   return {
     ...workspace,
+    id: `workspace-active-review-r${workspace.revision + 1}`,
     publicationType: input.publicationType,
     title,
     headline,
@@ -866,7 +1028,10 @@ export function replaceReviewPacket(
     claims,
     evidence: [],
     edges: [],
+    sourcePublicationBrief: structuredClone(publicationBrief),
+    publicationBrief,
     audit: [...workspace.audit, event],
+    invalidatedReceipt: workspace.receipt ?? workspace.invalidatedReceipt,
     receipt: undefined,
   };
 }
@@ -1038,7 +1203,7 @@ function periodContinuesSentence(left: string, punctuation: string, right: strin
   return false;
 }
 
-function splitPublicSentences(draftText: string): string[] {
+function splitPublicParagraphSentences(draftText: string): string[] {
   const sentences: string[] = [];
   const boundaryPattern = /([.!?]+(?:[\"'’”\)\]]+)?)(\s+)/g;
   let sentenceStart = 0;
@@ -1061,6 +1226,14 @@ function splitPublicSentences(draftText: string): string[] {
   return sentences;
 }
 
+function splitPublicSentences(draftText: string): string[] {
+  return draftText
+    .split(PARAGRAPH_BREAK_PATTERN)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .flatMap(splitPublicParagraphSentences);
+}
+
 export function candidateClaimsFromDraft(draftText: string): string[] {
   const sentences = splitPublicSentences(draftText);
   const oversizedSentence = sentences.find((sentence) => sentence.length > 500);
@@ -1070,9 +1243,9 @@ export function candidateClaimsFromDraft(draftText: string): string[] {
     );
   }
   const candidates = sentences.filter((sentence) => sentence.length >= 3);
-  if (candidates.length > 11) {
+  if (candidates.length > 48) {
     throw new Error(
-      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 11 body sentences plus its headline.`,
+      `TOO_MANY_CANDIDATES: found ${candidates.length}; a packet may contain at most 48 body sentences plus its headline.`,
     );
   }
   return candidates;
@@ -1181,6 +1354,22 @@ function assertPublicationCoverage(
 export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
   const blockers: GateBlocker[] = [];
 
+  if (workspace.claims.length === 0) {
+    return {
+      status: "blocked",
+      checkedRevision: workspace.revision,
+      blockers: [
+        {
+          claimId: "publication",
+          code: "PUBLICATION_COVERAGE_INVALID",
+          detail: "No publication is loaded. Import a source before running release checks.",
+        },
+      ],
+      openHumanDecisions: 0,
+      releasableClaims: 0,
+    };
+  }
+
   const coverageIssue = publicationCoverageIssue(
     workspace.headline,
     workspace.draftText,
@@ -1225,11 +1414,26 @@ export function verifyReleaseGate(workspace: Workspace): ReleaseGate {
       continue;
     }
     if (claim.state === "resolved") {
-      if (claimEdges.length === 0) {
+      const adverseEdge = claimEdges.find(
+        (edge) => edge.relation === "contradicts" || edge.relation === "outdated",
+      );
+      const resolutionEdges = claimEdges.filter(
+        (edge) => edge.relation === "supports" || edge.relation === "qualifies",
+      );
+      if (adverseEdge) {
+        blockers.push({
+          claimId: claim.id,
+          code:
+            adverseEdge.relation === "outdated" ? "OUTDATED" : "CONTRADICTED",
+          detail:
+            "Human-approved wording still has an adverse evidence relation. Reclassify or replace the evidence before release.",
+        });
+      } else if (resolutionEdges.length === 0) {
         blockers.push({
           claimId: claim.id,
           code: "NO_RESOLUTION_EVIDENCE",
-          detail: "Human-approved wording still needs at least one linked evidence record.",
+          detail:
+            "Human-approved wording still needs at least one supporting or qualifying evidence record.",
         });
       } else if (claim.humanApproval !== "approved") {
         blockers.push({
@@ -1366,6 +1570,29 @@ export async function createProofReceipt(
     };
   });
 
+  const publicationBrief =
+    workspace.publicationBrief ??
+    createSourceOnlyPublicationBrief({
+      publicationType: workspace.publicationType,
+      title: workspace.title,
+      headline: workspace.headline,
+      body: workspace.draftText,
+    });
+  validatePublicationBrief(publicationBrief);
+  const expectedReceiptBriefType: PublicationBrief["publicationType"] =
+    workspace.publicationType === "launch-page"
+      ? "launch"
+      : workspace.publicationType === "project-page"
+        ? "case-study"
+        : workspace.publicationType === "blog-post"
+          ? "article"
+          : "report";
+  if (publicationBrief.publicationType !== expectedReceiptBriefType) {
+    throw new Error(
+      `PUBLICATION_BRIEF_TYPE_MISMATCH: ${workspace.publicationType} requires ${expectedReceiptBriefType}.`,
+    );
+  }
+
   let packetAuditStart = 0;
   workspace.audit.forEach((event, index) => {
     if (event.action === "PACKET_IMPORTED" || event.action === "PACKET_REPLACED") {
@@ -1373,10 +1600,13 @@ export async function createProofReceipt(
     }
   });
 
+  const generatedAt = new Date().toISOString();
   const proofContent = {
+    generatedAt,
     sourceWorkspaceRevision: workspace.revision,
     publicationType: workspace.publicationType,
-    previewTemplateVersion: 2 as const,
+    previewTemplateVersion: 3 as const,
+    publicationBrief,
     title: workspace.title,
     headline: workspace.headline,
     finalText: workspace.draftText,
@@ -1387,7 +1617,6 @@ export async function createProofReceipt(
 
   return {
     receiptId: `proof-${contentHash.slice(0, 12)}`,
-    generatedAt: new Date().toISOString(),
     contentHash,
     ...proofContent,
   };
@@ -1410,6 +1639,14 @@ export function storeReceipt(
     ...workspace,
     revision: workspace.revision + 1,
     receipt,
+    invalidatedReceipt: undefined,
     audit: [...workspace.audit, event],
   };
 }
+import {
+  createProofRailSelfDemoBrief,
+  createSourceOnlyPublicationBrief,
+  replacePublicationBriefClaim,
+  validatePublicationBrief,
+  type PublicationBrief,
+} from "./publication-brief.ts";

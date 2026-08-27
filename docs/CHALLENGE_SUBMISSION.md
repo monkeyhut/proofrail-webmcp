@@ -1,124 +1,155 @@
-# OpenAI WebMCP Challenge submission kit
+# OpenAI WebMCP Challenge submission kit — DRAFT ONLY
 
-## Verified project links
+This document is working copy. It has not been submitted. Local build, browser,
+workflow, accessibility, and Lighthouse evidence is recorded under `docs/qa/`;
+that evidence does not prove a public URL, final video, or Devpost entry.
 
-- Public source: https://github.com/monkeyhut/proofrail-webmcp
-- Deployment candidate: https://proofrail-webmcp.kingacht.chatgpt.site
-  (the current site is owner-only; the verified PR head awaits explicit merge,
-  production-deploy, and public-access approval)
+## Candidate links
+
+- Source candidate: `https://github.com/monkeyhut/proofrail-webmcp`
+- Deployment candidate: `https://proofrail-webmcp.kingacht.chatgpt.site`
+
+Both targets require final current-revision verification. Public deployment,
+merge, and Devpost submission need separate explicit human approval.
 
 ## Title
 
-ProofRail — The pre-publication claim gate
+ProofRail — Publication Compiler
 
 ## Tagline
 
-Before company content goes live, AI checks the proof, a human approves the
-exact words, and ProofRail controls Publish.
+See the finished page, prove every factual claim, and keep release locked until
+a human approves.
 
 ## Short description
 
-ProofRail is a pre-publication preview and release gate for claims in project
-pages, blog posts, launch pages, and reports. It renders the exact current words
-in a simulated public layout before they ship. An agent works directly with the
-live page through six WebMCP tools: it reads the publication type, headline,
-body, and revisions; maps atomic claims to dated source excerpts; marks each
-relationship as support, qualification, contradiction, or outdated evidence;
-and stages the smallest defensible language changes.
+ProofRail is the review and approval workspace marketing and PR teams use before
+publishing a launch page, case study, article, or report.
 
-The agent cannot approve its own work. Its staged language appears only in an
-explicit **AI proposal · not approved** preview beside the unchanged current
-draft. A human accepts the linked evidence and exact final wording in the shared
-interface, or rejects a proposed correction.
-ProofRail then runs deterministic rules—not an opaque confidence score—to block
-unsupported, contradicted, stale, unreviewed, or human-unapproved claims. A
-passing revision produces a Proof Receipt containing complete evidence
-provenance, the claim-evidence matrix, packet-scoped decision log, workspace
-revision, and SHA-256 content hash.
+It begins with the actual source material, converts it into a typed
+`PublicationBrief`, and renders a credible publication canvas for the selected
+format. Every supplied field retains provenance; missing fields remain visible
+requests for input instead of becoming invented copy, customer data, imagery,
+quotes, or metrics.
 
-The result is not an AI truth oracle. It is CI for public claims: a visible,
-auditable boundary between agent assistance and human publishing authority.
+An agent works against the same live state through six narrow WebMCP tools. It
+can inspect the publication, connect claims to evidence, stage safer wording,
+explain blockers, run the deterministic release-readiness check, and export a
+receipt after the gate passes. It cannot approve or reject as a human, create a
+human decision, publish, release, bypass the gate, or overwrite a stale
+revision.
+
+ProofRail separates **Current source**, **Proposed direction**, and **Release
+candidate**. Proposed wording remains visibly unapproved. Only an explicit
+human decision can create a release candidate, and that candidate must still
+pass deterministic checks for evidence, adverse or stale relationships, pending
+human review, and revision integrity.
+
+A passing result says **Ready for release**, never **Published**. Receipt
+creation is separate. The receipt binds the exact publication type, text,
+claims, evidence, human decisions, revision, timestamp, and SHA-256 hash. Any
+later mutation invalidates readiness and the previous receipt.
+
+The result is not an AI truth oracle or autonomous publishing system. It is a
+visible compiler and protected review boundary for public claims.
+
+## WebMCP tools
+
+| Tool | Agent authority |
+| --- | --- |
+| `get_review_context` | Read the current publication and review state |
+| `replace_review_packet` | Import exact source material at an expected workspace revision |
+| `attach_evidence` | Attach a dated excerpt with a typed relationship |
+| `stage_resolution_batch` | Stage revision-locked wording proposals |
+| `verify_release_gate` | Run deterministic release-readiness checks |
+| `export_proof_receipt` | Export a receipt only for a passing revision |
+
+No WebMCP tool can provide human approval or publish content.
 
 ## Recommended demo prompt
 
-> Read this ProofRail workspace. Explain each release blocker using the linked
-> evidence, then stage the narrowest defensible revisions for the blocked
-> claims. Do not approve anything. After I make the human decisions, re-read
-> the workspace, adapt any rejected proposal, verify the release gate, and
-> export the proof receipt.
+> Read the current ProofRail workspace. Explain each release blocker using the
+> linked evidence, then stage the narrowest defensible wording changes. Do not
+> approve, reject, publish, or represent any proposal as a human decision. After
+> I make the decisions in the visible interface, re-read the current revision,
+> run the release-readiness check, and export a receipt only if the gate passes.
 
-## Demo video — target 2:25
+## Demo video storyboard — target under three minutes
 
-| Time | Picture | Narration |
+This is a recording plan, not evidence that a final video exists.
+
+| Time | Picture | Narration intent |
 | --- | --- | --- |
-| 0:00–0:12 | Hero definition and launch-page preview, then “800 launch teams” beside the source proving only 800 waitlist sign-ups; the gate is visibly locked | “Before a launch page, project page, blog post, or report goes live, ProofRail previews it and checks every factual claim against its evidence.” |
-| 0:12–0:28 | Open available site tools | “The page exposes six WebMCP tools over the same live state the human sees.” |
-| 0:28–0:48 | Agent calls get_review_context | “The agent sees exact claim revisions and typed evidence—not a screenshot.” |
-| 0:48–1:06 | Agent calls stage_resolution_batch; preview switches from current draft to clearly labelled unapproved AI wording | “It narrows two claims and shows how the page could read, but it cannot approve its own work.” |
-| 1:06–1:25 | Human approves C-01 and rejects C-04; the live preview retains only the accepted wording | “The human accepts one and rejects one. The public preview follows that authority boundary immediately.” |
-| 1:25–1:44 | Agent re-reads and stages a new C-04 proposal | “The agent adapts to the new revision instead of overwriting it.” |
-| 1:44–1:58 | Human approves; the live publication header and dedicated publish-gate panel switch from locked to cleared | “Deterministic rules now pass all four claims.” |
-| 1:58–2:12 | Agent exports receipt; publication type, headline, final body, hash, and matrix appear | “The exact approved preview, evidence matrix, decisions, and SHA-256 hash become one proof receipt.” |
-| 2:12–2:25 | Load unseen Arbor draft | “And it is not hard-coded: an unseen draft becomes a fresh blocked claim rail through the same tools.” |
+| 0:00–0:15 | Fresh empty state, product explanation, import action, and locked gate in the first viewport | Identify the user, input, output, differentiator, and first action without a demo customer |
+| 0:15–0:30 | Load the clearly labelled ProofRail self-demo | Explain that the optional demo uses only ProofRail's repository-authored material |
+| 0:30–0:50 | Show the publication canvas and switch among launch, case study, article, and report | Demonstrate four structurally different publication compositions and honest missing-field modules |
+| 0:50–1:10 | Open the six WebMCP tools and call `get_review_context` | Show that the agent reads exact live state rather than pixels |
+| 1:10–1:30 | Select a factual sentence and open its linked source passage | Trace sentence → claim → evidence → support or conflict |
+| 1:30–1:50 | Stage a wording proposal through WebMCP | Show Proposed direction as unapproved and keep the release gate blocked |
+| 1:50–2:10 | Human accepts or rejects the exact proposal in the visible UI | Make the protected human boundary explicit |
+| 2:10–2:28 | Run **Check release readiness** | Show real blockers or a real pass immediately; no timer or simulated progress |
+| 2:28–2:42 | If and only if the gate passes, create and inspect the receipt | Distinguish readiness and receipt creation from publishing |
+| 2:42–2:55 | Mutate the source and show readiness/receipt invalidation | Demonstrate revision binding and fail-loudly behavior |
 
-Use real screen capture with audible narration. Keep the final upload public and
-under three minutes.
+Use real screen capture with audible English narration. Do not splice together
+states that did not occur in the recorded run.
 
-## Why it scores
+## Why it fits
 
 ### WebMCP leverage
 
-The agent needs page-owned draft state, exact revisions, evidence edges, human
-decisions, and release rules. The multi-step workflow is materially safer and
-more reliable than pixel automation or detached chat suggestions.
+The agent needs page-owned source text, claim spans, evidence relationships,
+human decisions, revisions, and gate output. WebMCP makes those explicit and
+typed while the human sees the same state and retains sole decision authority.
 
 ### Execution
 
-The full state change is visible in the publication itself: current draft,
-unapproved agent proposal, human decision, recomputed gate, audit entry, and
-receipt. Narrow schemas, exact headline/body spans, and revision locks fail
-loudly.
+The intended experience is tool-first: honest import, a large publication
+canvas, a contextual review rail, four format-specific renderers, real blocker
+focus, visible proposal authority, protected human decisions, and a separately
+created receipt. The current local production run passed the evidence gates in
+`docs/qa/`; public-host and judge-equivalent checks remain separate.
 
 ### Potential impact
 
-Marketing, policy, fundraising, research communication, and public reporting
-all publish claims from fragmented source packets. ProofRail creates a reusable
-release discipline without pretending to automate truth.
+Marketing, PR, research communication, policy, and public reporting all move
+factual language from fragmented sources toward release. ProofRail creates one
+review boundary without claiming to automate truth or editorial accountability.
 
 ### Creativity and ambition
 
-ProofRail treats language like deployable code: evidence edges are tests,
-staged rewrites are patches, human approval is protected review, and the proof
-receipt is the build artifact.
+ProofRail treats language like a compiled release: source material becomes a
+typed brief, claims are checked against evidence, proposals are staged changes,
+human approval is protected review, the gate is deterministic verification, and
+the receipt is a state-bound artifact.
 
 ### Visual execution
 
-The opening frame explains the product and shows the real launch-page output at
-the same time. Each accepted input has its own publication grammar: project
-case study, editorial blog, launch page, or formal report. The active interface
-uses no video or interactive 3D runtime. A disclosed two-frame workflow study
-can move only as far as the real gate allows, and a static Meshy dossier makes
-the review layers tangible without entering any customer publication preview.
-Its other cinematic motion comes from masked typography, ruled layouts, and the
-actual draft → evidence → human → release-ready state change. Several
-MotionSites member examples informed editorial scale, asymmetric composition,
-workflow logic, and controlled transitions; none of their prompts, code, or
-hosted assets is copied.
+The product shell is an editorial review tool, not a marketing showreel. The
+public canvas changes composition for launch, case study, article, and report.
+Motion is reserved for real focus and state transitions. No cinematic video or
+3D runtime is used because neither earned a product role. The only retained
+generated medium is a reviewed social card documented in
+`docs/ASSET_PROVENANCE.md`.
 
 ## Submission checklist
 
-- [x] Functional WebMCP implementation
-- [x] English product copy
-- [x] Public-license file
-- [x] Public repository with GitHub-detected MIT license
-- [x] Reproducible local verification commands
-- [x] Social preview artwork
-- [x] Refreshed desktop and narrow-layout submission screenshots
-- [x] Public GitHub repository URL
-- [x] Source-level clarity heuristic at 100/100 in the local gauntlet
-- [ ] Public live deployment URL and judge-equivalent WebMCP re-test
-- [ ] Public YouTube demo with audio, under three minutes
-- [ ] Devpost URLs and final submit
+- [x] Final domain and `PublicationBrief` tests recorded
+- [x] Final WebMCP contract and all six tool paths recorded locally
+- [x] Production build, lint, typecheck, dependency audit, and console review recorded
+- [x] Complete blocked → human decision → ready → receipt → invalidated E2E path recorded
+- [x] All four renderers captured on desktop and mobile with ProofRail-owned QA copy
+- [x] Required responsive viewports verified without overflow
+- [x] Keyboard, focus, reduced motion, live regions, and axe verification recorded
+- [x] Chromium, Firefox, and WebKit verified at all eight required viewports
+- [x] Representative Lighthouse evidence recorded; field INP remains unavailable
+- [x] Three independent gauntlet reviews meet every minimum (lowest 94/100)
+- [x] Current screenshots generated only by the passing QA runner
+- [ ] Public repository, exact commit, license, and CI verified
+- [ ] Public URL deployed and tested in a judge-equivalent session
+- [ ] Public demo video with audible English narration uploaded
+- [ ] Devpost form reviewed by the participant
+- [ ] Explicit human approval to merge, deploy, and submit received
+- [ ] Devpost submission verified after that approval
 
-Do not mark the remaining items complete without checking the real public
-targets. See `docs/CHALLENGE_COMPLIANCE.md` for the official requirement matrix.
+See `docs/CHALLENGE_COMPLIANCE.md` for the working requirement matrix.

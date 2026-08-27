@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   approveClaimEvidence,
   attachEvidence,
   candidateClaimsFromDraft,
-  changePublicationType,
-  createDemoWorkspace,
+  createEmptyWorkspace,
+  createProofRailSelfDemoWorkspace,
   createProofReceipt,
   decideProposal,
   demoResolutions,
@@ -25,14 +25,192 @@ import {
   type Workspace,
 } from "../lib/proofrail";
 import {
-  PublicationPreview,
-  type BrandDirection,
-  type HeroFocalPoint,
-  type PreviewProfile,
-} from "./publication-preview";
-import { WorkflowCinematic } from "./workflow-cinematic";
+  createSourceOnlyPublicationBrief,
+  publicationStructureClaimTargets,
+  type SourceOnlyPublicationStructure,
+} from "../lib/publication-brief";
+import {
+  MAX_HERO_ASSET_BYTES,
+  attachUploadedHeroAsset,
+  extractPublicationText,
+  validatePublicationUrl,
+} from "../lib/publication-import";
+import type {
+  BrandDirection,
+  PreviewProfile,
+} from "./preview-profile";
+import { EmptyStudio } from "./empty-studio";
+import { ReleaseReadiness } from "./release-readiness";
+import { ReviewStudio } from "./review-studio";
 
 type ToolStatus = "checking" | "registered" | "unsupported" | "error";
+type ImportSourceMode = "text" | "url" | "file";
+
+type ImportedTextFile = {
+  fileName: string;
+  mediaType: string;
+  sha256: string;
+};
+
+type ImportedHeroAsset = {
+  fileName: string;
+  mediaType: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  sha256: string;
+};
+
+type ImportStructureKey =
+  | "deck"
+  | "productName"
+  | "positioning"
+  | "featureTitle"
+  | "featureBody"
+  | "benefitTitle"
+  | "benefitBody"
+  | "useCaseAudience"
+  | "useCaseOutcome"
+  | "availability"
+  | "pricingOrAccess"
+  | "client"
+  | "project"
+  | "roles"
+  | "scope"
+  | "challenge"
+  | "insight"
+  | "approach"
+  | "systemTitle"
+  | "systemBody"
+  | "implementationTitle"
+  | "implementationBody"
+  | "outcomes"
+  | "credits"
+  | "publication"
+  | "category"
+  | "thesis"
+  | "pullQuote"
+  | "pullQuoteAttribution"
+  | "institution"
+  | "edition"
+  | "abstract"
+  | "executiveSummary"
+  | "findings"
+  | "methodology"
+  | "limitations";
+
+type ImportStructureFields = Record<ImportStructureKey, string>;
+
+const emptyImportStructure: ImportStructureFields = {
+  deck: "",
+  productName: "",
+  positioning: "",
+  featureTitle: "",
+  featureBody: "",
+  benefitTitle: "",
+  benefitBody: "",
+  useCaseAudience: "",
+  useCaseOutcome: "",
+  availability: "",
+  pricingOrAccess: "",
+  client: "",
+  project: "",
+  roles: "",
+  scope: "",
+  challenge: "",
+  insight: "",
+  approach: "",
+  systemTitle: "",
+  systemBody: "",
+  implementationTitle: "",
+  implementationBody: "",
+  outcomes: "",
+  credits: "",
+  publication: "",
+  category: "",
+  thesis: "",
+  pullQuote: "",
+  pullQuoteAttribution: "",
+  institution: "",
+  edition: "",
+  abstract: "",
+  executiveSummary: "",
+  findings: "",
+  methodology: "",
+  limitations: "",
+};
+
+function optionalImportValue(value: string): string | undefined {
+  return value.trim() || undefined;
+}
+
+function importPublicationStructure(
+  publicationType: PublicationType,
+  fields: ImportStructureFields,
+): SourceOnlyPublicationStructure {
+  const common = { deck: optionalImportValue(fields.deck) };
+  switch (publicationType) {
+    case "launch-page":
+      return {
+        ...common,
+        launch: {
+          productName: optionalImportValue(fields.productName),
+          positioning: optionalImportValue(fields.positioning),
+          featureTitle: optionalImportValue(fields.featureTitle),
+          featureBody: optionalImportValue(fields.featureBody),
+          benefitTitle: optionalImportValue(fields.benefitTitle),
+          benefitBody: optionalImportValue(fields.benefitBody),
+          useCaseAudience: optionalImportValue(fields.useCaseAudience),
+          useCaseOutcome: optionalImportValue(fields.useCaseOutcome),
+          availability: optionalImportValue(fields.availability),
+          pricingOrAccess: optionalImportValue(fields.pricingOrAccess),
+        },
+      };
+    case "project-page":
+      return {
+        ...common,
+        caseStudy: {
+          client: optionalImportValue(fields.client),
+          project: optionalImportValue(fields.project),
+          roles: optionalImportValue(fields.roles),
+          scope: optionalImportValue(fields.scope),
+          challenge: optionalImportValue(fields.challenge),
+          insight: optionalImportValue(fields.insight),
+          approach: optionalImportValue(fields.approach),
+          systemTitle: optionalImportValue(fields.systemTitle),
+          systemBody: optionalImportValue(fields.systemBody),
+          implementationTitle: optionalImportValue(fields.implementationTitle),
+          implementationBody: optionalImportValue(fields.implementationBody),
+          outcomes: optionalImportValue(fields.outcomes),
+          credits: optionalImportValue(fields.credits),
+        },
+      };
+    case "blog-post":
+      return {
+        ...common,
+        article: {
+          publication: optionalImportValue(fields.publication),
+          category: optionalImportValue(fields.category),
+          thesis: optionalImportValue(fields.thesis),
+          pullQuote: optionalImportValue(fields.pullQuote),
+          pullQuoteAttribution: optionalImportValue(fields.pullQuoteAttribution),
+        },
+      };
+    case "report":
+      return {
+        ...common,
+        report: {
+          institution: optionalImportValue(fields.institution),
+          edition: optionalImportValue(fields.edition),
+          abstract: optionalImportValue(fields.abstract),
+          executiveSummary: optionalImportValue(fields.executiveSummary),
+          findings: optionalImportValue(fields.findings),
+          methodology: optionalImportValue(fields.methodology),
+          limitations: optionalImportValue(fields.limitations),
+        },
+      };
+  }
+}
 
 const toolManifest = [
   {
@@ -67,23 +245,16 @@ const toolManifest = [
   },
 ] as const;
 
-const demoPreviewProfile: PreviewProfile = {
-  brandName: "Northstar",
+const selfDemoPreviewProfile: PreviewProfile = {
+  brandName: "ProofRail",
   direction: "precision",
-  industry: "Launch operations",
-  audience: "Marketing and product teams",
-  author: "Northstar launch team",
+  industry: "Publication governance",
+  audience: "Marketing and PR teams",
+  author: "ProofRail product team",
   publishedLabel: "August 27, 2026",
-  ctaLabel: "Request access",
-  subjectName: "Northstar",
+  ctaLabel: "Review the release",
+  subjectName: "ProofRail",
   heroFocalPoint: "center",
-};
-
-const subjectLabels: Record<PublicationType, string> = {
-  "launch-page": "Product / release name",
-  "project-page": "Client / project subject",
-  "blog-post": "Series / article subject",
-  report: "Study / programme name",
 };
 
 const authorLabels: Record<PublicationType, string> = {
@@ -91,6 +262,68 @@ const authorLabels: Record<PublicationType, string> = {
   "project-page": "Studio / project author",
   "blog-post": "Article author",
   report: "Author / institution",
+};
+
+type StructureFieldDefinition = {
+  key: ImportStructureKey;
+  label: string;
+  placeholder: string;
+  multiline?: boolean;
+};
+
+const commonStructureField: StructureFieldDefinition = {
+  key: "deck",
+  label: "Deck / standfirst",
+  placeholder: "Exact supporting line from the source publication",
+};
+
+const structureFieldsByType: Record<
+  PublicationType,
+  readonly StructureFieldDefinition[]
+> = {
+  "launch-page": [
+    { key: "productName", label: "Product name", placeholder: "Real public product name" },
+    { key: "positioning", label: "Positioning", placeholder: "Exact supplied positioning line" },
+    { key: "featureTitle", label: "Feature chapter heading", placeholder: "Exact supplied heading" },
+    { key: "featureBody", label: "Feature chapter body", placeholder: "Source-backed feature explanation", multiline: true },
+    { key: "benefitTitle", label: "Benefit chapter heading", placeholder: "Exact supplied heading" },
+    { key: "benefitBody", label: "Benefit chapter body", placeholder: "Only a benefit supported by the source", multiline: true },
+    { key: "useCaseAudience", label: "Use-case audience", placeholder: "Real audience" },
+    { key: "useCaseOutcome", label: "Use-case outcome", placeholder: "Source-backed outcome" },
+    { key: "availability", label: "Availability", placeholder: "Verified availability statement" },
+    { key: "pricingOrAccess", label: "Pricing / access", placeholder: "Verified pricing or access statement" },
+  ],
+  "project-page": [
+    { key: "client", label: "Client", placeholder: "Real client name" },
+    { key: "project", label: "Project", placeholder: "Real project name" },
+    { key: "roles", label: "Roles", placeholder: "One documented role per line", multiline: true },
+    { key: "scope", label: "Scope", placeholder: "One documented scope item per line", multiline: true },
+    { key: "challenge", label: "Challenge", placeholder: "Exact source-backed challenge", multiline: true },
+    { key: "insight", label: "Insight", placeholder: "Exact supplied insight", multiline: true },
+    { key: "approach", label: "Approach", placeholder: "Exact supplied approach", multiline: true },
+    { key: "systemTitle", label: "System-in-use heading", placeholder: "Exact supplied heading" },
+    { key: "systemBody", label: "System in use", placeholder: "Evidence of the system in use", multiline: true },
+    { key: "implementationTitle", label: "Implementation heading", placeholder: "Exact supplied heading" },
+    { key: "implementationBody", label: "Implementation detail", placeholder: "Documented implementation detail", multiline: true },
+    { key: "outcomes", label: "Outcomes", placeholder: "One sourced outcome per line", multiline: true },
+    { key: "credits", label: "Credits", placeholder: "One real credit per line", multiline: true },
+  ],
+  "blog-post": [
+    { key: "publication", label: "Publication / masthead", placeholder: "Real publication name" },
+    { key: "category", label: "Editorial category", placeholder: "Real category" },
+    { key: "thesis", label: "Thesis", placeholder: "Exact human-identified thesis", multiline: true },
+    { key: "pullQuote", label: "Pull quote", placeholder: "Exact quote from supplied copy", multiline: true },
+    { key: "pullQuoteAttribution", label: "Quote attribution", placeholder: "Real attribution" },
+  ],
+  report: [
+    { key: "institution", label: "Issuing institution", placeholder: "Real institution" },
+    { key: "edition", label: "Edition / version", placeholder: "Exact edition or version" },
+    { key: "abstract", label: "Abstract", placeholder: "Supplied abstract", multiline: true },
+    { key: "executiveSummary", label: "Executive summary", placeholder: "Supplied executive summary", multiline: true },
+    { key: "findings", label: "Numbered findings", placeholder: "One per line: Finding title | Exact context", multiline: true },
+    { key: "methodology", label: "Methodology", placeholder: "Documented methodology", multiline: true },
+    { key: "limitations", label: "Limitations", placeholder: "Documented limitations and caveats", multiline: true },
+  ],
 };
 
 type ReplacePacketToolInput = ReplacePacketInput & {
@@ -109,13 +342,13 @@ type ReplacePacketToolInput = ReplacePacketInput & {
 function toolPreviewProfile(input: ReplacePacketToolInput): PreviewProfile {
   const profile = input.presentationProfile;
   return {
-    brandName: profile?.brandName?.trim() || "Your company",
+    brandName: profile?.brandName?.trim() || "Not provided",
     direction: profile?.direction ?? "precision",
-    industry: profile?.industry?.trim() || "General",
-    audience: profile?.audience?.trim() || "Public audience",
-    author: profile?.author?.trim() || "Editorial team",
-    publishedLabel: profile?.publishedLabel?.trim() || "Draft",
-    ctaLabel: profile?.ctaLabel?.trim() || "Learn more",
+    industry: profile?.industry?.trim() || "Not provided",
+    audience: profile?.audience?.trim() || "Not provided",
+    author: profile?.author?.trim() || "Not provided",
+    publishedLabel: profile?.publishedLabel?.trim() || "Not provided",
+    ctaLabel: profile?.ctaLabel?.trim() || "Not provided",
     subjectName: profile?.subjectName?.trim() || undefined,
     heroFocalPoint: "center",
   };
@@ -126,6 +359,21 @@ function reviewContextSnapshot(
   presentationProfile: PreviewProfile,
 ) {
   const gate = verifyReleaseGate(workspace);
+  const safePresentationProfile = {
+    brandName: presentationProfile.brandName,
+    direction: presentationProfile.direction,
+    industry: presentationProfile.industry,
+    audience: presentationProfile.audience,
+    author: presentationProfile.author,
+    publishedLabel: presentationProfile.publishedLabel,
+    ctaLabel: presentationProfile.ctaLabel,
+    subjectName: presentationProfile.subjectName,
+    heroAsset: {
+      present: Boolean(presentationProfile.heroAssetUrl),
+      alt: presentationProfile.heroAssetAlt,
+      focalPoint: presentationProfile.heroFocalPoint,
+    },
+  };
   return {
     workspace: {
       id: workspace.id,
@@ -135,7 +383,7 @@ function reviewContextSnapshot(
       draftText: workspace.draftText,
       revision: workspace.revision,
     },
-    presentationProfile,
+    presentationProfile: safePresentationProfile,
     claims: workspace.claims.map((claim) => ({
       id: claim.id,
       text: claim.text,
@@ -155,11 +403,13 @@ function reviewContextSnapshot(
         })),
     })),
     gate,
-    receipt: workspace.receipt
+    receipt: (workspace.receipt ?? workspace.invalidatedReceipt)
       ? {
-          receiptId: workspace.receipt.receiptId,
-          sourceWorkspaceRevision: workspace.receipt.sourceWorkspaceRevision,
-          contentHash: workspace.receipt.contentHash,
+          status: workspace.receipt ? "current" : "invalidated",
+          receiptId: (workspace.receipt ?? workspace.invalidatedReceipt)!.receiptId,
+          sourceWorkspaceRevision: (workspace.receipt ?? workspace.invalidatedReceipt)!
+            .sourceWorkspaceRevision,
+          contentHash: (workspace.receipt ?? workspace.invalidatedReceipt)!.contentHash,
         }
       : null,
   };
@@ -179,12 +429,58 @@ function downloadReceipt(receipt: ProofReceipt) {
   URL.revokeObjectURL(href);
 }
 
-export function ProofRailApp() {
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("FILE_READ_FAILED: image did not produce a data URL."));
+    });
+    reader.addEventListener("error", () =>
+      reject(new Error("FILE_READ_FAILED: image bytes could not be read.")),
+    );
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () =>
+      resolve({ width: image.naturalWidth, height: image.naturalHeight }),
+    );
+    image.addEventListener("error", () =>
+      reject(new Error("INVALID_IMAGE_BYTES: the selected image cannot be decoded.")),
+    );
+    image.src = dataUrl;
+  });
+}
+
+function publicationFileMediaType(file: File): string {
+  const declared = file.type.split(";", 1)[0]?.toLowerCase();
+  if (["text/plain", "text/markdown", "text/x-markdown", "text/html", "application/xhtml+xml"].includes(declared)) {
+    return declared;
+  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".html") || name.endsWith(".htm")) return "text/html";
+  if (name.endsWith(".md") || name.endsWith(".markdown")) return "text/markdown";
+  if (name.endsWith(".txt")) return "text/plain";
+  throw new Error("UNSUPPORTED_PUBLICATION_FILE: use TXT, Markdown, or HTML.");
+}
+
+export function ProofRailApp({ initialDemo = false }: { initialDemo?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace>(() =>
-    createDemoWorkspace(),
+    initialDemo ? createProofRailSelfDemoWorkspace() : createEmptyWorkspace(),
   );
   const workspaceRef = useRef(workspace);
-  const [selectedClaimId, setSelectedClaimId] = useState("claim-04");
+  const [selectedClaimId, setSelectedClaimId] = useState("");
   const [toolStatus, setToolStatus] = useState<ToolStatus>("checking");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -192,39 +488,41 @@ export function ProofRailApp() {
   const [receiptPending, setReceiptPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importSourceMode, setImportSourceMode] =
+    useState<ImportSourceMode>("text");
+  const [importSourceUrl, setImportSourceUrl] = useState("");
+  const [importTextMediaType, setImportTextMediaType] =
+    useState<"text/plain" | "text/markdown" | "text/html">("text/plain");
+  const [importedTextFile, setImportedTextFile] =
+    useState<ImportedTextFile | null>(null);
   const importDialogRef = useRef<HTMLElement>(null);
   const receiptDialogRef = useRef<HTMLElement>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
-  const [importTitle, setImportTitle] = useState("Untitled review packet");
-  const [importHeadline, setImportHeadline] = useState(
-    "A draft waiting for evidence.",
-  );
+  const [importTitle, setImportTitle] = useState("");
+  const [importHeadline, setImportHeadline] = useState("");
   const [importPublicationType, setImportPublicationType] =
     useState<PublicationType>("project-page");
-  const [importDraft, setImportDraft] = useState(
-    "Paste a short draft here. ProofRail will turn complete sentences into claim candidates for evidence review.",
-  );
+  const [importDraft, setImportDraft] = useState("");
   const [previewVariant, setPreviewVariant] =
     useState<PublicationPreviewVariant>("current");
   const [previewMode, setPreviewMode] = useState<"public" | "proof">("public");
   const [previewProfile, setPreviewProfile] =
-    useState<PreviewProfile>(demoPreviewProfile);
+    useState<PreviewProfile>(selfDemoPreviewProfile);
   const previewProfileRef = useRef(previewProfile);
-  const [importBrandName, setImportBrandName] = useState("Your company");
-  const [importDirection, setImportDirection] =
-    useState<BrandDirection>("precision");
-  const [importIndustry, setImportIndustry] = useState("Technology");
-  const [importAudience, setImportAudience] = useState("Customers and press");
-  const [importAuthor, setImportAuthor] = useState("Editorial team");
-  const [importPublishedLabel, setImportPublishedLabel] = useState(
-    "August 27, 2026",
-  );
-  const [importCtaLabel, setImportCtaLabel] = useState("Learn more");
-  const [importSubjectName, setImportSubjectName] = useState("Not specified");
-  const [importHeroAssetUrl, setImportHeroAssetUrl] = useState<string>();
+  const [importBrandName, setImportBrandName] = useState("");
+  const [importAudience, setImportAudience] = useState("");
+  const [importAuthor, setImportAuthor] = useState("");
+  const [importPublishedLabel, setImportPublishedLabel] = useState("");
+  const [importCtaLabel, setImportCtaLabel] = useState("");
+  const [importHeroAsset, setImportHeroAsset] =
+    useState<ImportedHeroAsset | null>(null);
   const [importHeroAssetAlt, setImportHeroAssetAlt] = useState("");
-  const [importHeroFocalPoint, setImportHeroFocalPoint] =
-    useState<HeroFocalPoint>("center");
+  const [importStructure, setImportStructure] =
+    useState<ImportStructureFields>(emptyImportStructure);
+
+  function updateImportStructure(key: ImportStructureKey, value: string) {
+    setImportStructure((current) => ({ ...current, [key]: value }));
+  }
 
   const commit = useCallback((transition: (current: Workspace) => Workspace) => {
     const next = transition(workspaceRef.current);
@@ -233,37 +531,11 @@ export function ProofRailApp() {
     return next;
   }, []);
 
-  const gate = useMemo(() => verifyReleaseGate(workspace), [workspace]);
-  const evidenceMapped = useMemo(
-    () =>
-      workspace.claims.length > 0 &&
-      workspace.claims.every((claim) =>
-        workspace.edges.some(
-          (edge) =>
-            edge.claimId === claim.id &&
-            workspace.evidence.some((record) => record.id === edge.evidenceId),
-        ),
-      ),
-    [workspace.claims, workspace.edges, workspace.evidence],
-  );
   const selectedClaim =
     workspace.claims.find((claim) => claim.id === selectedClaimId) ??
     workspace.claims[0];
-  const selectedEdges = selectedClaim
-    ? workspace.edges.filter((edge) => edge.claimId === selectedClaim.id)
-    : [];
-  const selectedEdge = selectedEdges[0];
-  const selectedEvidence = selectedEdge
-    ? workspace.evidence.find((record) => record.id === selectedEdge.evidenceId)
-    : undefined;
-  const selectedResolution = selectedClaim
-    ? demoResolutions[selectedClaim.id]
-    : undefined;
-  const selectedBlocker = selectedClaim
-    ? gate.blockers.find((blocker) => blocker.claimId === selectedClaim.id)
-    : undefined;
-  const selectedClaimCleared = Boolean(selectedClaim && !selectedBlocker);
-  const receiptModalOpen = receiptOpen && Boolean(workspace.receipt);
+  const displayedReceipt = workspace.receipt ?? workspace.invalidatedReceipt;
+  const receiptModalOpen = receiptOpen && Boolean(displayedReceipt);
   const importModalOpen = importOpen && !receiptModalOpen;
 
   useEffect(() => {
@@ -275,10 +547,12 @@ export function ProofRailApp() {
     if (!dialog) return;
     const activeDialog = dialog;
 
+    const activeElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     lastFocusedRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+      receiptModalOpen && (!activeElement || activeElement === document.body)
+        ? document.querySelector<HTMLElement>('[data-receipt-trigger="true"]')
+        : activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -322,9 +596,12 @@ export function ProofRailApp() {
     return () => {
       document.removeEventListener("keydown", handleDialogKeydown);
       document.body.style.overflow = previousOverflow;
-      if (lastFocusedRef.current?.isConnected) {
-        lastFocusedRef.current.focus();
-      }
+      queueMicrotask(() => {
+        const returnTarget = lastFocusedRef.current?.isConnected
+          ? lastFocusedRef.current
+          : document.querySelector<HTMLElement>('[data-receipt-trigger="true"]');
+        returnTarget?.focus();
+      });
     };
   }, [importModalOpen, receiptModalOpen]);
 
@@ -432,6 +709,19 @@ export function ProofRailApp() {
             draftText: toolInput.draftText,
             claims: toolInput.claims,
             expectedWorkspaceRevision: toolInput.expectedWorkspaceRevision,
+            publicationBrief: createSourceOnlyPublicationBrief({
+              publicationType: toolInput.publicationType,
+              organization: toolInput.presentationProfile?.brandName,
+              title: toolInput.title,
+              headline: toolInput.headline,
+              body: toolInput.draftText,
+              author: toolInput.presentationProfile?.author,
+              audience: toolInput.presentationProfile?.audience,
+              publishedLabel: toolInput.presentationProfile?.publishedLabel,
+              cta: toolInput.presentationProfile?.ctaLabel,
+              inputMethod: "form",
+              sourceActor: "agent",
+            }),
           };
           const next = commit((current) =>
             replaceReviewPacket(current, packetInput),
@@ -691,16 +981,27 @@ export function ProofRailApp() {
   }, [commit]);
 
   function resetDemo() {
-    const next = createDemoWorkspace();
+    const next = createProofRailSelfDemoWorkspace();
     workspaceRef.current = next;
     setWorkspace(next);
-    setSelectedClaimId("claim-04");
+    setSelectedClaimId("claim-01");
     setPreviewVariant("current");
     setPreviewMode("public");
-    previewProfileRef.current = demoPreviewProfile;
-    setPreviewProfile(demoPreviewProfile);
+    previewProfileRef.current = selfDemoPreviewProfile;
+    setPreviewProfile(selfDemoPreviewProfile);
     setReceiptOpen(false);
-    setNotice("Demo workspace reset to revision 7.");
+    setNotice("Verified ProofRail self-demo loaded at revision 7.");
+  }
+
+  function startNewReview() {
+    const next = createEmptyWorkspace();
+    workspaceRef.current = next;
+    setWorkspace(next);
+    setSelectedClaimId("");
+    setPreviewVariant("current");
+    setPreviewMode("public");
+    setReceiptOpen(false);
+    setNotice(null);
   }
 
   function inspectClaim(claimId: string) {
@@ -713,49 +1014,83 @@ export function ProofRailApp() {
     });
   }
 
-  function switchPublicationType(publicationType: PublicationType) {
-    const next = commit((current) =>
-      changePublicationType(current, publicationType),
-    );
-    setPreviewVariant("current");
-    setReceiptOpen(false);
-    setNotice(
-      `Preview rebuilt as ${publicationType.replaceAll("-", " ")} at revision ${next.revision}. Any sealed receipt was invalidated.`,
-    );
+  async function loadHeroAsset(file?: File) {
+    if (!file) {
+      setImportHeroAsset(null);
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setImportError("Hero asset must be PNG, JPEG, or WebP.");
+      return;
+    }
+    if (file.size > MAX_HERO_ASSET_BYTES) {
+      setImportError(
+        `Hero asset must be ${Math.floor(MAX_HERO_ASSET_BYTES / 1_000_000)}.5 MB or smaller.`,
+      );
+      return;
+    }
+    try {
+      const bytes = await file.arrayBuffer();
+      const dataUrl = await readFileAsDataUrl(file);
+      const dimensions = await imageDimensions(dataUrl);
+      setImportHeroAsset({
+        fileName: file.name,
+        mediaType: file.type,
+        dataUrl,
+        ...dimensions,
+        sha256: await sha256Hex(bytes),
+      });
+      setImportError(null);
+    } catch (error) {
+      setImportHeroAsset(null);
+      setImportError(
+        error instanceof Error ? error.message : "The image could not be inspected.",
+      );
+    }
   }
 
-  function loadHeroAsset(file?: File) {
+  async function loadPublicationFile(file?: File) {
     if (!file) {
-      setImportHeroAssetUrl(undefined);
+      setImportedTextFile(null);
       return;
     }
-    if (!file.type.startsWith("image/")) {
-      setImportError("Hero asset must be an image file.");
-      return;
+    try {
+      const mediaType = publicationFileMediaType(file);
+      const bytes = await file.arrayBuffer();
+      const text = new TextDecoder().decode(bytes);
+      const extracted = extractPublicationText(text, mediaType);
+      setImportDraft(extracted);
+      setImportedTextFile({
+        fileName: file.name,
+        mediaType,
+        sha256: await sha256Hex(bytes),
+      });
+      setImportError(null);
+    } catch (error) {
+      setImportedTextFile(null);
+      setImportError(
+        error instanceof Error ? error.message : "The publication file could not be read.",
+      );
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setImportError("Hero asset must be 8 MB or smaller for this local preview.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        setImportHeroAssetUrl(reader.result);
-        setImportError(null);
-      }
-    });
-    reader.addEventListener("error", () => {
-      setImportError("The hero asset could not be read locally.");
-    });
-    reader.readAsDataURL(file);
   }
 
   function stageDemoResolution(claim: ReviewClaim) {
+    if (workspaceRef.current.id !== "workspace-proofrail-self-demo") {
+      setNotice(
+        "SELF_DEMO_ONLY: no ProofRail example wording may be staged in an imported publication.",
+      );
+      return;
+    }
     const resolution = demoResolutions[claim.id];
     if (!resolution) return;
     try {
-      const next = commit((current) =>
-        stageResolutionBatch(
+      const next = commit((current) => {
+        if (current.id !== "workspace-proofrail-self-demo") {
+          throw new Error(
+            "SELF_DEMO_ONLY: imported publications cannot receive ProofRail example wording.",
+          );
+        }
+        return stageResolutionBatch(
           current,
           [
             {
@@ -766,8 +1101,8 @@ export function ProofRailApp() {
             },
           ],
           current.revision,
-        ),
-      );
+        );
+      });
       setPreviewVariant("proposed");
       setNotice(
         "Agent proposal staged at revision " +
@@ -780,10 +1115,19 @@ export function ProofRailApp() {
   }
 
   function decideSelected(decision: "approve" | "reject") {
-    if (!selectedClaim) return;
+    if (!selectedClaim?.proposal || selectedClaim.proposal.status !== "staged") return;
+    const expectedWorkspaceRevision = workspace.revision;
+    const expectedClaimRevision = selectedClaim.revision;
+    const expectedProposalId = selectedClaim.proposal.id;
     try {
       const next = commit((current) =>
-        decideProposal(current, selectedClaim.id, decision),
+        decideProposal(current, {
+          claimId: selectedClaim.id,
+          decision,
+          expectedWorkspaceRevision,
+          expectedClaimRevision,
+          expectedProposalId,
+        }),
       );
       setPreviewVariant(
         next.claims.some((claim) => claim.proposal?.status === "staged")
@@ -806,8 +1150,16 @@ export function ProofRailApp() {
 
   function approveSelectedEvidence() {
     if (!selectedClaim) return;
+    const expectedWorkspaceRevision = workspace.revision;
+    const expectedClaimRevision = selectedClaim.revision;
     try {
-      commit((current) => approveClaimEvidence(current, selectedClaim.id));
+      commit((current) =>
+        approveClaimEvidence(current, {
+          claimId: selectedClaim.id,
+          expectedWorkspaceRevision,
+          expectedClaimRevision,
+        }),
+      );
       setNotice(
         "Human approval recorded for the linked evidence and current wording.",
       );
@@ -816,16 +1168,90 @@ export function ProofRailApp() {
     }
   }
 
-  function loadImportedPacket() {
+  async function loadImportedPacket() {
     setImportError(null);
-    const normalizedDraft = importDraft
-      .replace(/\r\n/g, "\n")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    let candidates: string[];
+    const expectedWorkspaceRevision = workspaceRef.current.revision;
+    let normalizedDraft: string;
+    let sourcePublicUrl: string | undefined;
+
     try {
-      candidates = candidateClaimsFromDraft(normalizedDraft);
+      if (importSourceMode === "url") {
+        const validated = validatePublicationUrl(importSourceUrl);
+        let response: Response;
+        try {
+          response = await fetch(validated.url, {
+            headers: {
+              Accept: "text/html, text/plain, text/markdown;q=0.9",
+            },
+            credentials: "omit",
+            redirect: "follow",
+          });
+        } catch {
+          throw new Error(
+            "URL_IMPORT_BLOCKED: the source could not be fetched in this browser, usually because the site blocks cross-origin reads. Paste the HTML or upload a file instead.",
+          );
+        }
+        if (!response.ok) {
+          throw new Error(`URL_IMPORT_FAILED: source returned HTTP ${response.status}.`);
+        }
+        const mediaType =
+          response.headers.get("content-type")?.split(";", 1)[0]?.toLowerCase() ||
+          "text/html";
+        normalizedDraft = extractPublicationText(await response.text(), mediaType);
+        sourcePublicUrl = validatePublicationUrl(response.url || validated.url).url;
+      } else {
+        if (importSourceMode === "file" && !importedTextFile) {
+          throw new Error("PUBLICATION_FILE_REQUIRED: choose a TXT, Markdown, or HTML file.");
+        }
+        normalizedDraft = extractPublicationText(
+          importDraft,
+          importSourceMode === "file"
+            ? importedTextFile!.mediaType
+            : importTextMediaType,
+        );
+      }
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : "Unable to read the publication source.",
+      );
+      return;
+    }
+
+    const structuredPublication = importPublicationStructure(
+      importPublicationType,
+      importStructure,
+    );
+    let candidates: string[];
+    let reviewDraftText: string;
+    const structuredClaimTargets = new Map<string, string>();
+    try {
+      const sourceCandidates = candidateClaimsFromDraft(normalizedDraft);
+      const seenCandidates = new Set(sourceCandidates);
+      const structuredCandidates = publicationStructureClaimTargets(
+        importPublicationType,
+        structuredPublication,
+      )
+        .flatMap(({ text, targetId }) =>
+          candidateClaimsFromDraft(text).map((candidate) => ({
+            text: candidate,
+            targetId,
+          })),
+        )
+        .filter((candidate) => {
+          if (seenCandidates.has(candidate.text)) return false;
+          seenCandidates.add(candidate.text);
+          return true;
+        });
+      reviewDraftText = [
+        normalizedDraft,
+        ...structuredCandidates.map((candidate) => candidate.text),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      candidates = candidateClaimsFromDraft(reviewDraftText);
+      for (const candidate of structuredCandidates) {
+        structuredClaimTargets.set(candidate.text, candidate.targetId);
+      }
     } catch (error) {
       setImportError(
         error instanceof Error ? error.message : "Unable to inspect draft.",
@@ -836,47 +1262,109 @@ export function ProofRailApp() {
       setImportError("Add at least one complete sentence of 3 characters or more.");
       return;
     }
+
     try {
+      const recordedAt = new Date().toISOString();
+      const provenanceId = `source-${importSourceMode}-r${expectedWorkspaceRevision + 1}`;
+      let publicationBrief = createSourceOnlyPublicationBrief({
+        publicationType: importPublicationType,
+        organization: importBrandName.trim() || undefined,
+        title: importTitle,
+        headline: importHeadline,
+        body: normalizedDraft,
+        author: importAuthor.trim() || undefined,
+        audience: importAudience.trim() || undefined,
+        publishedLabel: importPublishedLabel.trim() || undefined,
+        cta:
+          importPublicationType === "report"
+            ? undefined
+            : importCtaLabel.trim() || undefined,
+        recordedAt,
+        provenanceId,
+        inputMethod:
+          importSourceMode === "url"
+            ? "url-import"
+            : importTextMediaType === "text/html"
+              ? "html"
+              : "text",
+        publicUrl: sourcePublicUrl,
+        uploadedFile:
+          importSourceMode === "file" && importedTextFile
+            ? {
+                fileName: importedTextFile.fileName,
+                mediaType: importedTextFile.mediaType,
+                sha256: importedTextFile.sha256,
+              }
+            : undefined,
+        structure: structuredPublication,
+      });
+
+      if (importHeroAsset) {
+        if (!importHeroAssetAlt.trim()) {
+          throw new Error(
+            "HERO_ALT_REQUIRED: describe the uploaded image before adding it to the publication.",
+          );
+        }
+        publicationBrief = await attachUploadedHeroAsset(publicationBrief, {
+          assetId: `uploaded-hero-r${expectedWorkspaceRevision + 1}`,
+          provenanceId: `uploaded-hero-source-r${expectedWorkspaceRevision + 1}`,
+          provenanceLabel: "Human-uploaded publication hero",
+          fileName: importHeroAsset.fileName,
+          mediaType: importHeroAsset.mediaType,
+          dataUrl: importHeroAsset.dataUrl,
+          width: importHeroAsset.width,
+          height: importHeroAsset.height,
+          altText: importHeroAssetAlt.trim(),
+          sha256: importHeroAsset.sha256,
+          recordedAt,
+          rights: "customer-supplied",
+        });
+      }
+
       const next = commit((current) =>
-        replaceReviewPacket(current, {
+          replaceReviewPacket(current, {
           publicationType: importPublicationType,
           title: importTitle,
           headline: importHeadline,
-          draftText: normalizedDraft,
+          draftText: reviewDraftText,
           claims: [
             {
               location: "headline" as const,
               text: importHeadline.trim(),
               risk: "medium" as const,
+              previewTargetId:
+                importPublicationType === "blog-post" ? "headline" : "title",
             },
             ...candidates.map((text) => ({
               location: "body" as const,
               text,
               risk: "medium" as const,
+              previewTargetId: structuredClaimTargets.get(text),
             })),
           ],
-          expectedWorkspaceRevision: current.revision,
-        }),
+          expectedWorkspaceRevision,
+          publicationBrief,
+        }, "human"),
       );
       setSelectedClaimId(next.claims[0].id);
       setPreviewVariant("current");
       setPreviewMode("public");
       const nextPreviewProfile: PreviewProfile = {
-        brandName: importBrandName.trim() || "Your company",
-        direction: importDirection,
-        industry: importIndustry.trim() || "General",
-        audience: importAudience.trim() || "Public audience",
-        author: importAuthor.trim() || "Editorial team",
-        publishedLabel: importPublishedLabel.trim() || "Draft",
-        ctaLabel: importCtaLabel.trim() || "Learn more",
-        subjectName: importSubjectName.trim() || undefined,
+        brandName: importBrandName.trim() || "Not provided",
+        direction: "precision",
+        industry: "Not provided",
+        audience: importAudience.trim() || "Not provided",
+        author: importAuthor.trim() || "Not provided",
+        publishedLabel: importPublishedLabel.trim() || "Not provided",
+        ctaLabel: importCtaLabel.trim() || "Not provided",
+        subjectName: undefined,
         heroAssetUrl:
-          importPublicationType === "report" ? undefined : importHeroAssetUrl,
+          importPublicationType === "report" ? undefined : importHeroAsset?.dataUrl,
         heroAssetAlt:
           importPublicationType === "report"
             ? undefined
             : importHeroAssetAlt.trim() || undefined,
-        heroFocalPoint: importHeroFocalPoint,
+        heroFocalPoint: "center",
       };
       previewProfileRef.current = nextPreviewProfile;
       setPreviewProfile(nextPreviewProfile);
@@ -884,9 +1372,7 @@ export function ProofRailApp() {
       setImportOpen(false);
       setReceiptOpen(false);
       setNotice(
-        "New packet loaded with " +
-          next.claims.length +
-          " unreviewed sentence candidates.",
+        `New ${importSourceMode} source loaded with ${next.claims.length} unreviewed sentence candidates.`,
       );
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -928,13 +1414,6 @@ export function ProofRailApp() {
     }
   }
 
-  const statusText: Record<ToolStatus, string> = {
-    checking: "WebMCP · connecting",
-    registered: "WebMCP · agent ready",
-    unsupported: "WebMCP · demo mode",
-    error: "WebMCP · unavailable",
-  };
-
   return (
     <main className="proofrail-shell" id="page-top">
       <div
@@ -942,447 +1421,62 @@ export function ProofRailApp() {
         inert={importModalOpen || receiptModalOpen ? true : undefined}
         aria-hidden={importModalOpen || receiptModalOpen ? true : undefined}
       >
-        <header className="rail-nav">
-          <a className="rail-wordmark" href="#page-top" aria-label="ProofRail, back to top">
-            <span aria-hidden="true">PR:</span>
-            <strong>ProofRail</strong>
-          </a>
-          <div className="rail-nav__context" aria-label="Product definition">
-            <span>Pre-publication review</span>
-            <strong>Marketing + PR</strong>
-          </div>
-          <div className="rail-nav__actions">
-            <button
-              className="rail-nav__import"
-              onClick={() => {
-                setImportError(null);
-                setImportOpen(true);
-              }}
-            >
-              Import a draft
-            </button>
-            <button className="rail-nav__reset" onClick={resetDemo}>
-              Reset
-            </button>
-            <button
-              className={`rail-nav__tools tool-status-${toolStatus}`}
-              onClick={() => setToolsOpen((current) => !current)}
-              aria-expanded={toolsOpen}
-              aria-controls="webmcp-tool-drawer"
-              aria-label={`${toolsOpen ? "Close" : "Open"} WebMCP tools. ${statusText[toolStatus]}. ${gate.blockers.length} blockers.`}
-            >
-              <span className="rail-status-dot" aria-hidden="true" />
-              <span>{statusText[toolStatus]}</span>
-              <strong>{gate.blockers.length}</strong>
-            </button>
-          </div>
-        </header>
-
-        {toolsOpen && (
-          <section
-            className="rail-tool-drawer"
-            id="webmcp-tool-drawer"
-            aria-label="ProofRail WebMCP tools"
-          >
-            <header>
-              <div>
-                <p>Agent protocol / six tools</p>
-                <h2>The agent may prepare. It may never approve.</h2>
-              </div>
-              <button onClick={() => setToolsOpen(false)} aria-label="Close tools">
-                Close ×
-              </button>
-            </header>
-            <div className="rail-tool-index">
-              {toolManifest.map((tool, index) => (
-                <article key={tool.name}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <code>{tool.name}</code>
-                  <p>{tool.description}</p>
-                  <em>{tool.kind}</em>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="rail-hero" aria-labelledby="page-title">
-          <div className="rail-hero__copy">
-            <p className="rail-kicker">
-              <span aria-hidden="true" />
-              The pre-publication workspace for marketing and PR
-            </p>
-            <h1 id="page-title">
-              <span><span>Your page.</span></span>
-              <span><span>Every claim.</span></span>
-              <span className="rail-hero__accent"><span>One human gate.</span></span>
-            </h1>
-            <p className="rail-definition">
-              Before your company publishes a launch page, case study, article, or
-              report, ProofRail renders the actual audience-facing page. AI checks
-              every factual sentence against source evidence and may stage a safer
-              revision. A human makes the final call. Until then, publishing stays
-              locked.
-            </p>
-            <div className="rail-hero__definition" aria-label="ProofRail in one line">
-              <span>Draft in</span>
-              <i aria-hidden="true">→</i>
-              <span>Real page preview</span>
-              <i aria-hidden="true">→</i>
-              <span>Evidence + human approval</span>
-              <i aria-hidden="true">→</i>
-              <strong>Publish</strong>
-            </div>
-            <div className="rail-hero__actions">
-              <button
-                className="rail-button rail-button--light"
-                onClick={() => {
-                  setImportError(null);
-                  setImportOpen(true);
-                }}
-              >
-                Import your draft <span aria-hidden="true">↗</span>
-              </button>
-              <button
-                className="rail-button rail-button--text"
-                onClick={() => inspectClaim("claim-04")}
-              >
-                Turn on proof view <span aria-hidden="true">↗</span>
-              </button>
-            </div>
-            <p className="rail-hero__clarifier">
-              This is not a news site and not a CMS. It is the review room used
-              immediately before public release.
-            </p>
-          </div>
-
-          {selectedClaim && (
-            <article
-              id="inspection-bay"
-              className={`rail-preview-stage ${selectedClaimCleared ? "is-cleared" : "is-blocked"}`}
-              aria-labelledby="inspection-title"
-              tabIndex={-1}
-            >
-              <header className="rail-preview-stage__head">
-                <div>
-                  <span>The page your audience would see</span>
-                  <strong id="inspection-title">{workspace.title} · live layout</strong>
-                </div>
-                <div className="rail-preview-stage__gate">
-                  <span aria-hidden="true">{gate.status === "pass" ? "✓" : "×"}</span>
-                  <div>
-                    <strong>{gate.status === "pass" ? "Ready to publish" : "Publish locked"}</strong>
-                    <small>
-                      {gate.blockers.length}{" "}
-                      {gate.blockers.length === 1 ? "blocker" : "blockers"} remain
-                    </small>
-                  </div>
-                </div>
-              </header>
-
-              {previewMode === "proof" && (
-                <aside className="rail-preview-stage__evidence" aria-live="polite">
-                  <div className="rail-preview-stage__claim">
-                    <span>C-{selectedClaim.number} · the page says</span>
-                    <strong>“{selectedClaim.text}”</strong>
-                  </div>
-                  <div className="rail-preview-stage__source">
-                    <span>{selectedEvidence ? "The attached source says" : "Attached source"}</span>
-                    <strong>
-                      {selectedEvidence
-                        ? `“${selectedEvidence.excerpt}”`
-                        : "No usable source is attached."}
-                    </strong>
-                  </div>
-                  <div className="rail-preview-stage__decision">
-                    {selectedClaim.proposal?.status === "staged" ? (
-                      <>
-                        <span>AI proposal · human decision required</span>
-                        <div>
-                          <button onClick={() => decideSelected("reject")}>Reject</button>
-                          <button onClick={() => decideSelected("approve")}>Approve wording</button>
-                        </div>
-                      </>
-                    ) : selectedClaimCleared ? (
-                      <strong className="rail-approved">Human approved · claim cleared</strong>
-                    ) : selectedClaim.state === "supported" && selectedEvidence ? (
-                      <button onClick={approveSelectedEvidence}>Approve evidence + wording</button>
-                    ) : selectedResolution ? (
-                      <button onClick={() => stageDemoResolution(selectedClaim)}>
-                        Prepare evidence-safe wording <span aria-hidden="true">→</span>
-                      </button>
-                    ) : (
-                      <strong>Proof must be attached before approval.</strong>
-                    )}
-                  </div>
-                </aside>
-              )}
-
-              <PublicationPreview
-                workspace={workspace}
-                profile={previewProfile}
-                selectedClaimId={selectedClaimId}
-                variant={previewVariant}
-                mode={previewMode}
-                size="hero"
-                onVariantChange={setPreviewVariant}
-                onModeChange={setPreviewMode}
-                onTypeChange={switchPublicationType}
-                onDirectionChange={(direction) =>
-                  setPreviewProfile((current) => {
-                    const next = { ...current, direction };
-                    previewProfileRef.current = next;
-                    return next;
-                  })
-                }
-                onSelectClaim={inspectClaim}
-              />
-            </article>
-          )}
-        </section>
-
-        {notice && (
-          <div className="rail-notice" role="status">
-            <span>{notice}</span>
-            <button onClick={() => setNotice(null)} aria-label="Dismiss message">×</button>
-          </div>
-        )}
-
-        <section className="rail-method" id="method" aria-labelledby="method-title">
-          <header className="rail-section-head">
-            <p>One source in. A defensible publication out.</p>
-            <h2 id="method-title">The logic, without the AI theatre.</h2>
-          </header>
-          <WorkflowCinematic
-            gateStatus={gate.status}
-            blockerCount={gate.blockers.length}
-            evidenceMapped={evidenceMapped}
+        {workspace.claims.length === 0 ? (
+          <EmptyStudio
+            toolStatus={toolStatus}
+            onImport={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+            onLoadSelfDemo={resetDemo}
           />
-          <div className="rail-method__grid">
-            <article tabIndex={0}>
-              <span className="rail-method__index">01 / Import</span>
-              <h3>One draft. Four real layouts.</h3>
-              <p>Paste the copy once. ProofRail renders it as the publication you selected.</p>
-              <div className="rail-diagram rail-diagram--formats" aria-hidden="true">
-                <span className="rail-source-sheet">TXT</span>
-                <i />
-                <div>
-                  <span>LAUNCH</span><span>PROJECT</span><span>BLOG</span><span>REPORT</span>
-                </div>
-              </div>
-            </article>
-            <article tabIndex={0}>
-              <span className="rail-method__index">02 / AI check</span>
-              <h3>Evidence lines. Not confidence scores.</h3>
-              <p>Each factual sentence must lead to a dated source that actually supports it.</p>
-              <div className="rail-diagram rail-diagram--evidence" aria-hidden="true">
-                <span>CLAIM C-04</span><i /><b>×</b><i /><span>SOURCE</span>
-              </div>
-            </article>
-            <article tabIndex={0}>
-              <span className="rail-method__index">03 / Human gate</span>
-              <h3>AI proposes. People approve.</h3>
-              <p>The model can narrow wording. Only a visible human action can release it.</p>
-              <div className="rail-diagram rail-diagram--gate" aria-hidden="true">
-                <span>DRAFT</span><i /><span>AI</span><i /><b>HUMAN</b><i /><span>PUBLISH</span>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="rail-workspace" id="workspace" aria-labelledby="workspace-title">
-          <header className="rail-section-head rail-section-head--workspace">
-            <p>Live review workspace</p>
-            <h2 id="workspace-title">Select a sentence. See the proof. Make the call.</h2>
-            <span>
-              This is the actual app: the preview above and every control below share
-              the same live draft state.
-            </span>
-          </header>
-
-          <div className="rail-workspace__grid">
-            <nav className="rail-claims" aria-label="Claims in this publication">
-              <header>
-                <span>Claim index</span>
-                <strong>{workspace.claims.length} sentences</strong>
-              </header>
-              <div>
-                {workspace.claims.map((claim) => {
-                  const blocker = gate.blockers.find((item) => item.claimId === claim.id);
-                  const cleared = !blocker;
-                  return (
-                    <button
-                      key={claim.id}
-                      className={`${cleared ? "is-clear" : "is-blocked"}${selectedClaimId === claim.id ? " is-active" : ""}`}
-                      onClick={() => inspectClaim(claim.id)}
-                      aria-pressed={selectedClaimId === claim.id}
-                      aria-controls="inspection-bay"
-                    >
-                      <span>C-{claim.number}</span>
-                      <strong>{claim.text}</strong>
-                      <small>
-                        {claim.proposal?.status === "staged"
-                          ? "AI wording staged · human decision open"
-                          : blocker?.code === "HUMAN_APPROVAL_REQUIRED"
-                            ? "Source attached · human approval open"
-                            : cleared
-                              ? "Cleared"
-                              : blocker?.detail ?? claim.label}
-                      </small>
-                    </button>
-                  );
-                })}
-              </div>
-            </nav>
-
-            {selectedClaim && (
-              <article className="rail-dossier" aria-live="polite">
-                <header>
-                  <div>
-                    <span>Evidence dossier / C-{selectedClaim.number}</span>
-                    <strong>{selectedClaim.risk} risk · {selectedClaim.location}</strong>
-                  </div>
-                  <em>{selectedClaimCleared ? "CLEARED" : "BLOCKED"}</em>
-                </header>
-                <div className="rail-dossier__claim">
-                  <span>Public wording</span>
-                  <blockquote>“{selectedClaim.text}”</blockquote>
-                </div>
-                <div className="rail-dossier__proof">
-                  <span>Attached proof</span>
-                  {selectedEvidence ? (
-                    <>
-                      <strong>{selectedEvidence.title}</strong>
-                      <blockquote>“{selectedEvidence.excerpt}”</blockquote>
-                      <small>
-                        {selectedEdge?.relation.toUpperCase() ?? "UNLINKED"} · {selectedEvidence.sourceType.replaceAll("-", " ")} · {selectedEvidence.publishedAt}
-                      </small>
-                    </>
-                  ) : (
-                    <strong>No source attached. The release gate fails closed.</strong>
-                  )}
-                </div>
-                {selectedClaim.proposal && (
-                  <div className="rail-dossier__proposal">
-                    <span>AI proposal · not approved</span>
-                    <p>{selectedClaim.proposal.after}</p>
-                    <small>{selectedClaim.proposal.rationale}</small>
-                  </div>
-                )}
-                <div className="rail-dossier__actions">
-                  {selectedClaim.proposal?.status === "staged" ? (
-                    <>
-                      <button onClick={() => decideSelected("reject")}>Reject proposal</button>
-                      <button className="is-primary" onClick={() => decideSelected("approve")}>
-                        Approve exact wording
-                      </button>
-                    </>
-                  ) : selectedClaimCleared ? (
-                    <strong className="rail-approved">Human approved · audit event recorded</strong>
-                  ) : selectedClaim.state === "supported" && selectedEvidence ? (
-                    <button className="is-primary" onClick={approveSelectedEvidence}>
-                      Approve evidence + wording
-                    </button>
-                  ) : selectedResolution ? (
-                    <button className="is-primary" onClick={() => stageDemoResolution(selectedClaim)}>
-                      Stage evidence-safe wording
-                    </button>
-                  ) : (
-                    <strong>Agent action required: attach qualifying proof.</strong>
-                  )}
-                </div>
-              </article>
-            )}
-
-            <aside
-              className={`rail-gate ${gate.status === "pass" ? "is-pass" : "is-blocked"}`}
-              aria-labelledby="release-title"
-            >
-              <header>
-                <p>04 / Publish gate</p>
-                <h3 id="release-title">
-                  {gate.status === "pass" ? "Release cleared." : "Publication locked."}
-                </h3>
-              </header>
-              <dl>
-                <div><dt>Cleared</dt><dd>{gate.releasableClaims}</dd></div>
-                <div><dt>Blocked</dt><dd>{gate.blockers.length}</dd></div>
-                <div><dt>Human calls</dt><dd>{gate.openHumanDecisions}</dd></div>
-              </dl>
-              {gate.blockers.length > 0 ? (
-                <ol>
-                  {gate.blockers.slice(0, 4).map((blocker) => {
-                    const claim = workspace.claims.find((candidate) => candidate.id === blocker.claimId);
-                    return (
-                      <li key={`${blocker.claimId}-${blocker.code}`}>
-                        <span>C-{claim?.number ?? "--"}</span>
-                        <div>
-                          <strong>{blocker.code.replaceAll("_", " ")}</strong>
-                          <p>{blocker.detail}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <div className="rail-gate__ready">
-                  <strong>All claims cleared.</strong>
-                  <p>Final wording, sources, decisions, revision, and hash can be sealed.</p>
-                </div>
-              )}
-              <button
-                className="rail-gate__seal"
-                disabled={gate.status !== "pass" || receiptPending}
-                aria-busy={receiptPending}
-                onClick={() => void generateReceipt()}
-              >
-                <span>
-                  {receiptPending
-                    ? "Sealing proof receipt…"
-                    : gate.status === "pass"
-                      ? "Seal proof receipt"
-                      : "Receipt stays locked"}
-                </span>
-                <span aria-hidden="true">↗</span>
-              </button>
-            </aside>
-          </div>
-        </section>
-
-        <section className="rail-ledger" aria-label="Decision log">
-          <details>
-            <summary>
-              <span>Audit ledger / current workspace</span>
-              <strong>{workspace.audit.length} recorded events</strong>
-              <em>Open ledger +</em>
-            </summary>
-            <ol>
-              {workspace.audit
-                .slice()
-                .reverse()
-                .slice(0, 8)
-                .map((event) => (
-                  <li key={event.id}>
-                    <span>{event.actor}</span>
-                    <div>
-                      <strong>{event.action.replaceAll("_", " ")}</strong>
-                      <p>{event.detail}</p>
-                    </div>
-                    <span>R{event.workspaceRevision}</span>
-                  </li>
-                ))}
-            </ol>
-          </details>
-        </section>
-
-        <footer className="rail-footer">
-          <strong>ProofRail does not decide truth.</strong>
-          <p>
-            It makes the page, evidence gaps, revisions, and human decisions visible
-            before anything becomes public.
-          </p>
-          <span>Local-first challenge prototype · no account · no API key · no hidden approval</span>
-        </footer>
+        ) : (
+          <ReviewStudio
+            workspace={workspace}
+            selectedClaimId={selectedClaim?.id ?? ""}
+            previewVariant={previewVariant}
+            proofVisible={previewMode === "proof"}
+            toolStatus={toolStatus}
+            toolsOpen={toolsOpen}
+            toolManifest={toolManifest}
+            notice={notice}
+            receiptPending={receiptPending}
+            onImport={() => {
+              setImportError(null);
+              setImportOpen(true);
+            }}
+            onStartNew={startNewReview}
+            onToggleTools={() => setToolsOpen((current) => !current)}
+            onDismissNotice={() => setNotice(null)}
+            onVariantChange={setPreviewVariant}
+            onProofVisibleChange={(visible) =>
+              setPreviewMode(visible ? "proof" : "public")
+            }
+            onSelectClaim={inspectClaim}
+            onSelectSource={(_evidenceId, claimId) => inspectClaim(claimId)}
+            canStageProposal={(claim) =>
+              workspace.id === "workspace-proofrail-self-demo" &&
+              Boolean(demoResolutions[claim.id])
+            }
+            onStageProposal={stageDemoResolution}
+            onDecideProposal={decideSelected}
+            onApproveEvidence={approveSelectedEvidence}
+            onRunReleaseCheck={() => verifyReleaseGate(workspaceRef.current)}
+            onCreateReceipt={() => void generateReceipt()}
+            onOpenReceipt={() => setReceiptOpen(true)}
+            releaseReadiness={
+              <ReleaseReadiness
+                currentRevision={workspace.revision}
+                runReleaseCheck={() => verifyReleaseGate(workspaceRef.current)}
+                claims={workspace.claims}
+                evidence={workspace.evidence}
+                edges={workspace.edges}
+                onSelectClaim={inspectClaim}
+                onSelectSource={(_evidenceId, claimId) => inspectClaim(claimId)}
+              />
+            }
+          />
+        )}
       </div>
 
       {importModalOpen && (
@@ -1405,12 +1499,86 @@ export function ProofRailApp() {
                 ×
               </button>
             </div>
-            <section className="import-section" aria-labelledby="import-format-title">
+            <section className="import-section" aria-labelledby="import-source-title">
               <div className="import-section__head">
                 <span>01</span>
                 <div>
-                  <h3 id="import-format-title">What should the public page feel like?</h3>
-                  <p>Format changes the information architecture. Direction changes the brand tone.</p>
+                  <h3 id="import-source-title">Bring the source you are actually preparing</h3>
+                  <p>ProofRail keeps the imported bytes and provenance separate from any later proposal.</p>
+                </div>
+              </div>
+              <div className="import-source-tabs" role="group" aria-label="Publication source type">
+                {(["text", "url", "file"] as const).map((mode) => (
+                  <button
+                    type="button"
+                    key={mode}
+                    aria-pressed={importSourceMode === mode}
+                    onClick={() => {
+                      setImportSourceMode(mode);
+                      setImportError(null);
+                      if (mode !== "file") setImportedTextFile(null);
+                    }}
+                  >
+                    {mode === "text" ? "Text / HTML" : mode === "url" ? "Public or local URL" : "Document file"}
+                  </button>
+                ))}
+              </div>
+              <div className="import-grid import-source-controls">
+                {importSourceMode === "text" ? (
+                  <label>
+                    Pasted source format
+                    <select
+                      value={importTextMediaType}
+                      onChange={(event) =>
+                        setImportTextMediaType(
+                          event.target.value as "text/plain" | "text/markdown" | "text/html",
+                        )
+                      }
+                    >
+                      <option value="text/plain">Plain text</option>
+                      <option value="text/markdown">Markdown</option>
+                      <option value="text/html">HTML</option>
+                    </select>
+                  </label>
+                ) : null}
+                {importSourceMode === "url" ? (
+                  <label className="import-source-wide">
+                    Source URL
+                    <input
+                      type="url"
+                      value={importSourceUrl}
+                      placeholder="https://example.com/release-draft"
+                      onChange={(event) => setImportSourceUrl(event.target.value)}
+                    />
+                    <small>
+                      Browser-side HTTP(S) import only. If the site blocks cross-origin reads, paste its HTML or upload a file.
+                    </small>
+                  </label>
+                ) : null}
+                {importSourceMode === "file" ? (
+                  <label className="import-source-wide import-file">
+                    TXT, Markdown, or HTML document
+                    <input
+                      type="file"
+                      accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html"
+                      onChange={(event) => void loadPublicationFile(event.target.files?.[0])}
+                    />
+                    <small>
+                      {importedTextFile
+                        ? `${importedTextFile.fileName} · SHA-256 recorded`
+                        : "The file is read locally. Its exact bytes are hashed and kept in provenance."}
+                    </small>
+                  </label>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-format-title">
+              <div className="import-section__head">
+                <span>02</span>
+                <div>
+                  <h3 id="import-format-title">Choose the real publication type</h3>
+                  <p>Each type uses its own composition system. Missing source fields stay visibly missing.</p>
                 </div>
               </div>
               <div className="import-grid">
@@ -1418,52 +1586,26 @@ export function ProofRailApp() {
                   Publication format
                   <select
                     value={importPublicationType}
-                    onChange={(event) =>
-                      setImportPublicationType(event.target.value as PublicationType)
-                    }
+                    onChange={(event) => {
+                      const nextType = event.target.value as PublicationType;
+                      setImportPublicationType(nextType);
+                      setImportStructure(emptyImportStructure);
+                      if (nextType === "report") setImportHeroAsset(null);
+                    }}
                   >
                     <option value="launch-page">Product launch</option>
                     <option value="project-page">Project / case study</option>
-                    <option value="blog-post">Blog / journal article</option>
+                    <option value="blog-post">Editorial article</option>
                     <option value="report">Research report</option>
                   </select>
                 </label>
                 <label>
-                  Art direction
-                  <select
-                    value={importDirection}
-                    onChange={(event) =>
-                      setImportDirection(event.target.value as BrandDirection)
-                    }
-                  >
-                    <option value="precision">Precision tech</option>
-                    <option value="editorial">Editorial human</option>
-                    <option value="institutional">Institutional</option>
-                    <option value="kinetic">Bold consumer</option>
-                  </select>
-                </label>
-                <label>
-                  Brand / company
+                  Publishing organization
                   <input
                     value={importBrandName}
                     maxLength={80}
+                    placeholder="Only the real organization"
                     onChange={(event) => setImportBrandName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  {subjectLabels[importPublicationType]}
-                  <input
-                    value={importSubjectName}
-                    maxLength={100}
-                    onChange={(event) => setImportSubjectName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Industry / subject
-                  <input
-                    value={importIndustry}
-                    maxLength={80}
-                    onChange={(event) => setImportIndustry(event.target.value)}
                   />
                 </label>
                 <label>
@@ -1471,6 +1613,7 @@ export function ProofRailApp() {
                   <input
                     value={importAudience}
                     maxLength={100}
+                    placeholder="Who will read this publication?"
                     onChange={(event) => setImportAudience(event.target.value)}
                   />
                 </label>
@@ -1479,6 +1622,7 @@ export function ProofRailApp() {
                   <input
                     value={importAuthor}
                     maxLength={100}
+                    placeholder="Real author or responsible team"
                     onChange={(event) => setImportAuthor(event.target.value)}
                   />
                 </label>
@@ -1487,67 +1631,101 @@ export function ProofRailApp() {
                   <input
                     value={importPublishedLabel}
                     maxLength={80}
+                    placeholder="Approved date, edition, or draft label"
                     onChange={(event) => setImportPublishedLabel(event.target.value)}
                   />
                 </label>
-                {importPublicationType !== "report" && (
+                {importPublicationType !== "report" ? (
                   <label>
                     Primary CTA
                     <input
                       value={importCtaLabel}
                       maxLength={60}
+                      placeholder="Only when the source contains a CTA"
                       onChange={(event) => setImportCtaLabel(event.target.value)}
                     />
                   </label>
-                )}
-                {importPublicationType !== "report" && (
+                ) : null}
+                {importPublicationType !== "report" ? (
                   <>
                     <label className="import-file">
-                      Real hero / product asset (optional)
+                      Supplied hero / product image (optional)
                       <input
                         type="file"
-                        accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
-                        onChange={(event) => loadHeroAsset(event.target.files?.[0])}
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) => void loadHeroAsset(event.target.files?.[0])}
                       />
                       <small>
-                        {importHeroAssetUrl
-                          ? "Image loaded locally for this preview."
-                          : "No stock image is invented. Without an asset, ProofRail uses a typographic direction."}
+                        {importHeroAsset
+                          ? `${importHeroAsset.fileName} · ${importHeroAsset.width}×${importHeroAsset.height} · SHA-256 recorded`
+                          : "No stock image or fake UI is generated when media is missing."}
                       </small>
                     </label>
                     <label>
-                      Hero image description (alt text)
+                      Image description (required with image)
                       <input
                         value={importHeroAssetAlt}
                         maxLength={180}
                         onChange={(event) => setImportHeroAssetAlt(event.target.value)}
-                        placeholder="Describe the image only; do not add a new claim"
+                        placeholder="Describe only what the supplied image shows"
                       />
                     </label>
-                    <label>
-                      Image focus
-                      <select
-                        value={importHeroFocalPoint}
-                        onChange={(event) =>
-                          setImportHeroFocalPoint(event.target.value as HeroFocalPoint)
-                        }
-                      >
-                        <option value="left">Left</option>
-                        <option value="center">Center</option>
-                        <option value="right">Right</option>
-                      </select>
-                    </label>
                   </>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="import-section" aria-labelledby="import-structure-title">
+              <div className="import-section__head">
+                <span>03</span>
+                <div>
+                  <h3 id="import-structure-title">Structure this publication</h3>
+                  <p>
+                    Fill only modules present in the source. These fields shape the
+                    selected renderer; blanks remain explicit requests for input.
+                  </p>
+                </div>
+              </div>
+              <div className="import-grid import-structure-grid">
+                {[commonStructureField, ...structureFieldsByType[importPublicationType]].map(
+                  (field) => (
+                    <label
+                      key={field.key}
+                      className={field.multiline ? "import-structure-wide" : undefined}
+                    >
+                      {field.label}
+                      {field.multiline ? (
+                        <textarea
+                          value={importStructure[field.key]}
+                          maxLength={2400}
+                          rows={4}
+                          placeholder={field.placeholder}
+                          onChange={(event) =>
+                            updateImportStructure(field.key, event.target.value)
+                          }
+                        />
+                      ) : (
+                        <input
+                          value={importStructure[field.key]}
+                          maxLength={400}
+                          placeholder={field.placeholder}
+                          onChange={(event) =>
+                            updateImportStructure(field.key, event.target.value)
+                          }
+                        />
+                      )}
+                    </label>
+                  ),
                 )}
               </div>
             </section>
 
             <section className="import-section" aria-labelledby="import-copy-title">
               <div className="import-section__head">
-                <span>02</span>
+                <span>04</span>
                 <div>
-                  <h3 id="import-copy-title">What exactly are you claiming?</h3>
-                  <p>Every complete public sentence becomes an exact review span.</p>
+                  <h3 id="import-copy-title">Confirm the exact public wording</h3>
+                  <p>The headline and every complete body sentence become exact, reviewable claim spans.</p>
                 </div>
               </div>
               <div className="import-grid import-grid--copy">
@@ -1556,6 +1734,7 @@ export function ProofRailApp() {
                   <input
                     value={importTitle}
                     maxLength={120}
+                    placeholder="Internal review packet title"
                     onChange={(event) => setImportTitle(event.target.value)}
                   />
                 </label>
@@ -1564,18 +1743,31 @@ export function ProofRailApp() {
                   <input
                     value={importHeadline}
                     maxLength={180}
+                    placeholder="Exact public headline"
                     onChange={(event) => setImportHeadline(event.target.value)}
                   />
                 </label>
-                <label className="import-copy-field">
-                  Public body copy
-                  <textarea
-                    value={importDraft}
-                    maxLength={8000}
-                    rows={9}
-                    onChange={(event) => setImportDraft(event.target.value)}
-                  />
-                </label>
+                {importSourceMode === "url" ? (
+                  <div className="import-copy-field import-source-message">
+                    <strong>Body copy will be extracted from the URL at import.</strong>
+                    <p>The browser removes scripts, styles, hidden containers, and markup before claim extraction.</p>
+                  </div>
+                ) : (
+                  <label className="import-copy-field">
+                    Public body copy
+                    <textarea
+                      value={importDraft}
+                      maxLength={8000}
+                      rows={9}
+                      readOnly={importSourceMode === "file"}
+                      placeholder="Paste the exact public body copy. No content is invented when a field is missing."
+                      onChange={(event) => setImportDraft(event.target.value)}
+                    />
+                    {importSourceMode === "file" ? (
+                      <small>Read-only extraction from the hashed file selected in step 01.</small>
+                    ) : null}
+                  </label>
+                )}
               </div>
             </section>
             {importError && (
@@ -1591,7 +1783,7 @@ export function ProofRailApp() {
               Put every factual statement in the public headline or body; profile
               fields are short layout metadata, not a path around the proof gate.
             </p>
-            <button className="modal-primary" onClick={loadImportedPacket}>
+            <button className="modal-primary" onClick={() => void loadImportedPacket()}>
               Load unreviewed packet
               <span>→</span>
             </button>
@@ -1599,7 +1791,7 @@ export function ProofRailApp() {
         </div>
       )}
 
-      {receiptModalOpen && workspace.receipt && (
+      {receiptModalOpen && displayedReceipt && (
         <div className="modal-backdrop receipt-backdrop" role="presentation">
           <section
             ref={receiptDialogRef}
@@ -1610,13 +1802,13 @@ export function ProofRailApp() {
             tabIndex={-1}
           >
             <div className="receipt-seal">
-              <span>PASS</span>
+              <span>{workspace.receipt ? "PASS" : "VOID"}</span>
               <small>SHA-256</small>
             </div>
             <div className="modal-heading">
               <div>
                 <p className="kicker">Proof receipt</p>
-                <h2 id="receipt-title">{workspace.receipt.receiptId}</h2>
+                <h2 id="receipt-title">{displayedReceipt.receiptId}</h2>
               </div>
               <button
                 onClick={() => setReceiptOpen(false)}
@@ -1627,24 +1819,32 @@ export function ProofRailApp() {
             </div>
             <dl className="receipt-facts">
               <div>
+                <dt>Receipt state</dt>
+                <dd>{workspace.receipt ? "Current" : "Invalidated by later revision"}</dd>
+              </div>
+              <div>
+                <dt>Generated at</dt>
+                <dd>{displayedReceipt.generatedAt}</dd>
+              </div>
+              <div>
                 <dt>Sealed workspace revision</dt>
-                <dd>{workspace.receipt.sourceWorkspaceRevision}</dd>
+                <dd>{displayedReceipt.sourceWorkspaceRevision}</dd>
               </div>
               <div>
                 <dt>Claims</dt>
-                <dd>{workspace.receipt.matrix.length}</dd>
+                <dd>{displayedReceipt.matrix.length}</dd>
               </div>
               <div>
                 <dt>Publication</dt>
-                <dd>{workspace.receipt.publicationType.replaceAll("-", " ")}</dd>
+                <dd>{displayedReceipt.publicationType.replaceAll("-", " ")}</dd>
               </div>
               <div className="hash-row">
                 <dt>Content hash</dt>
-                <dd>{workspace.receipt.contentHash}</dd>
+                <dd>{displayedReceipt.contentHash}</dd>
               </div>
             </dl>
             <div className="receipt-matrix">
-              {workspace.receipt.matrix.map((row) => (
+              {displayedReceipt.matrix.map((row) => (
                 <article key={row.claimId}>
                   <span>
                     {row.claimId.toUpperCase()} · {row.claimLocation}
@@ -1661,7 +1861,7 @@ export function ProofRailApp() {
             </div>
             <button
               className="modal-primary"
-              onClick={() => downloadReceipt(workspace.receipt as ProofReceipt)}
+              onClick={() => downloadReceipt(displayedReceipt)}
             >
               Download receipt JSON
               <span>↓</span>

@@ -16,8 +16,108 @@ import {
 } from "../lib/proofrail.ts";
 import { extractPublicationMetric } from "../lib/publication-metrics.ts";
 
+function decideCurrent(
+  current: ReturnType<typeof createDemoWorkspace>,
+  claimId: string,
+  decision: "approve" | "reject",
+) {
+  const claim = current.claims.find((candidate) => candidate.id === claimId);
+  if (!claim?.proposal) throw new Error(`NO_STAGED_PROPOSAL: ${claimId}`);
+  return decideProposal(current, {
+    claimId,
+    decision,
+    expectedWorkspaceRevision: current.revision,
+    expectedClaimRevision: claim.revision,
+    expectedProposalId: claim.proposal.id,
+  });
+}
+
+function approveCurrentEvidence(
+  current: ReturnType<typeof createDemoWorkspace>,
+  claimId: string,
+) {
+  const claim = current.claims.find((candidate) => candidate.id === claimId);
+  if (!claim) throw new Error(`UNKNOWN_CLAIM: ${claimId}`);
+  return approveClaimEvidence(current, {
+    claimId,
+    expectedWorkspaceRevision: current.revision,
+    expectedClaimRevision: claim.revision,
+  });
+}
+
 let workspace = createDemoWorkspace();
 let gate = verifyReleaseGate(workspace);
+
+let heroPreservationWorkspace = createDemoWorkspace();
+if (
+  heroPreservationWorkspace.publicationBrief?.publicationType !== "launch" ||
+  heroPreservationWorkspace.sourcePublicationBrief?.publicationType !== "launch"
+) {
+  throw new Error("Expected launch briefs for hero-preservation regression.");
+}
+const uploadedHeroProvenance = {
+  id: "uploaded-hero-regression",
+  kind: "uploaded-file" as const,
+  label: "Uploaded hero regression fixture",
+  fileName: "hero.png",
+  mediaType: "image/png",
+  sha256: "a".repeat(64),
+  recordedAt: "2026-08-27T08:02:00.000Z",
+  rights: "customer-supplied" as const,
+};
+const uploadedHero = {
+  id: "uploaded-hero-regression",
+  kind: "image" as const,
+  role: "hero" as const,
+  src: "/media/uploaded-hero-regression.png",
+  mimeType: "image/png",
+  width: 1600,
+  height: 900,
+  provenanceIds: [uploadedHeroProvenance.id],
+  alt: {
+    status: "provided" as const,
+    value: "Uploaded hero regression fixture.",
+    provenanceIds: [uploadedHeroProvenance.id],
+  },
+  caption: {
+    status: "missing" as const,
+    reason: "not-provided" as const,
+    request: "No caption was supplied for this regression fixture.",
+  },
+  loading: "eager" as const,
+};
+for (const brief of [
+  heroPreservationWorkspace.sourcePublicationBrief,
+  heroPreservationWorkspace.publicationBrief,
+]) {
+  brief.provenance = [...brief.provenance, uploadedHeroProvenance];
+  brief.mediaAssets = [...brief.mediaAssets, uploadedHero];
+}
+const immutableHeroSource = structuredClone(
+  heroPreservationWorkspace.sourcePublicationBrief,
+);
+heroPreservationWorkspace = stageResolutionBatch(
+  heroPreservationWorkspace,
+  [
+    {
+      claimId: "claim-01",
+      revisedText: demoResolutions["claim-01"].revisedText,
+      rationale: demoResolutions["claim-01"].rationale,
+      expectedClaimRevision: 1,
+    },
+  ],
+  heroPreservationWorkspace.revision,
+);
+heroPreservationWorkspace = decideCurrent(
+  heroPreservationWorkspace,
+  "claim-01",
+  "approve",
+);
+assert.deepEqual(
+  heroPreservationWorkspace.sourcePublicationBrief,
+  immutableHeroSource,
+);
+assert.deepEqual(heroPreservationWorkspace.publicationBrief?.mediaAssets, [uploadedHero]);
 
 assert.equal(workspace.revision, 7);
 assert.equal(workspace.publicationType, "launch-page");
@@ -54,6 +154,7 @@ assert.equal(
 );
 
 const canonicalBeforeStaging = structuredClone(workspace);
+const sourceBriefBeforeStaging = structuredClone(workspace.sourcePublicationBrief);
 workspace = stageResolutionBatch(
   workspace,
   ["claim-01", "claim-04"].map((claimId) => ({
@@ -70,11 +171,13 @@ const currentProjection = buildPublicationPreview(workspace, "current");
 const proposedProjection = buildPublicationPreview(workspace, "proposed");
 assert.equal(currentProjection.headline, canonicalBeforeStaging.headline);
 assert.equal(currentProjection.body, canonicalBeforeStaging.draftText);
-assert.match(proposedProjection.headline, /In an eight-team pilot/);
-assert.match(proposedProjection.body, /Joined by 800 people/);
+assert.match(proposedProjection.headline, /exact final wording/);
+assert.match(proposedProjection.body, /passing ProofRail receipt/);
 assert.deepEqual(proposedProjection.stagedClaimIds, ["claim-01", "claim-04"]);
 assert.equal(workspace.headline, canonicalBeforeStaging.headline);
 assert.equal(workspace.draftText, canonicalBeforeStaging.draftText);
+assert.deepEqual(workspace.sourcePublicationBrief, sourceBriefBeforeStaging);
+assert.deepEqual(workspace.publicationBrief, canonicalBeforeStaging.publicationBrief);
 
 assert.throws(
   () =>
@@ -93,19 +196,31 @@ assert.throws(
   /STALE_WORKSPACE/,
 );
 
-workspace = decideProposal(workspace, "claim-01", "approve");
-assert.match(workspace.headline, /In an eight-team pilot/);
-assert.doesNotMatch(workspace.draftText, /In an eight-team pilot/);
+workspace = decideCurrent(workspace, "claim-01", "approve");
+assert.match(workspace.headline, /exact final wording/);
+assert.doesNotMatch(workspace.draftText, /exact final wording/);
 assert.equal(buildPublicationPreview(workspace, "current").headline, workspace.headline);
 assert.equal(verifyReleaseGate(workspace).blockers.length, 1);
+assert.deepEqual(workspace.sourcePublicationBrief, sourceBriefBeforeStaging);
+assert.equal(workspace.publicationBrief?.publicationType, "launch");
+if (workspace.publicationBrief?.publicationType !== "launch") {
+  throw new Error("Expected preserved launch release candidate.");
+}
+assert.equal(workspace.publicationBrief.featureChapters.status, "provided");
+assert.match(
+  workspace.publicationBrief.title.status === "provided"
+    ? workspace.publicationBrief.title.value
+    : "",
+  /exact final wording/,
+);
 
-workspace = decideProposal(workspace, "claim-04", "reject");
+workspace = decideCurrent(workspace, "claim-04", "reject");
 gate = verifyReleaseGate(workspace);
 assert.equal(gate.status, "blocked");
 assert.equal(gate.blockers[0].code, "RESOLUTION_REJECTED");
 assert.doesNotMatch(
   buildPublicationPreview(workspace, "proposed").body,
-  /Joined by 800 people/,
+  /passing ProofRail receipt/,
 );
 
 workspace = stageResolutionBatch(
@@ -120,23 +235,112 @@ workspace = stageResolutionBatch(
   ],
   workspace.revision,
 );
-workspace = decideProposal(workspace, "claim-04", "approve");
+workspace = decideCurrent(workspace, "claim-04", "approve");
 gate = verifyReleaseGate(workspace);
 assert.equal(gate.status, "pass");
 assert.equal(gate.blockers.length, 0);
 
+const adverseResolutionWorkspace = structuredClone(workspace);
+adverseResolutionWorkspace.edges = adverseResolutionWorkspace.edges.map((edge) =>
+  edge.claimId === "claim-04"
+    ? { ...edge, relation: "contradicts" as const }
+    : edge,
+);
+assert.equal(
+  verifyReleaseGate(adverseResolutionWorkspace).blockers.find(
+    (blocker) => blocker.claimId === "claim-04",
+  )?.code,
+  "CONTRADICTED",
+);
+await assert.rejects(
+  () => createProofReceipt(adverseResolutionWorkspace),
+  /RELEASE_BLOCKED.*claim-04:CONTRADICTED/,
+);
+
+const staleApprovalSource = createDemoWorkspace();
+const staleApprovalClaim = staleApprovalSource.claims[0];
+const staleApprovalInput = {
+  claimId: staleApprovalClaim.id,
+  expectedWorkspaceRevision: staleApprovalSource.revision,
+  expectedClaimRevision: staleApprovalClaim.revision,
+};
+const changedBeforeApproval = changePublicationType(
+  staleApprovalSource,
+  "report",
+);
+assert.throws(
+  () => approveClaimEvidence(changedBeforeApproval, staleApprovalInput),
+  /STALE_WORKSPACE/,
+);
+
+const stagedForStaleDecision = stageResolutionBatch(
+  createDemoWorkspace(),
+  [
+    {
+      claimId: "claim-01",
+      revisedText: demoResolutions["claim-01"].revisedText,
+      rationale: demoResolutions["claim-01"].rationale,
+      expectedClaimRevision: 1,
+    },
+  ],
+  7,
+);
+const stagedClaimForStaleDecision = stagedForStaleDecision.claims[0];
+const staleDecisionInput = {
+  claimId: stagedClaimForStaleDecision.id,
+  decision: "approve" as const,
+  expectedWorkspaceRevision: stagedForStaleDecision.revision,
+  expectedClaimRevision: stagedClaimForStaleDecision.revision,
+  expectedProposalId: stagedClaimForStaleDecision.proposal!.id,
+};
+assert.throws(
+  () =>
+    decideProposal(stagedForStaleDecision, {
+      ...staleDecisionInput,
+      expectedClaimRevision: stagedClaimForStaleDecision.revision - 1,
+    }),
+  /STALE_CLAIM/,
+);
+assert.throws(
+  () =>
+    decideProposal(stagedForStaleDecision, {
+      ...staleDecisionInput,
+      expectedProposalId: "proposal-obsolete",
+    }),
+  /STALE_PROPOSAL/,
+);
+const changedBeforeDecision = changePublicationType(
+  stagedForStaleDecision,
+  "report",
+);
+assert.throws(
+  () => decideProposal(changedBeforeDecision, staleDecisionInput),
+  /STALE_WORKSPACE/,
+);
+
 const receipt = await createProofReceipt(workspace);
+assert.equal(receipt.publicationBrief.publicationType, "launch");
+if (receipt.publicationBrief.publicationType !== "launch") {
+  throw new Error("Expected a launch brief in the receipt.");
+}
+assert.equal(receipt.publicationBrief.featureChapters.status, "provided");
+assert.deepEqual(workspace.sourcePublicationBrief, sourceBriefBeforeStaging);
 assert.equal(receipt.contentHash.length, 64);
+assert.equal(Number.isNaN(Date.parse(receipt.generatedAt)), false);
 assert.equal(receipt.matrix.length, 4);
 assert.equal(receipt.sourceWorkspaceRevision, workspace.revision);
 assert.equal(receipt.publicationType, "launch-page");
-assert.equal(receipt.previewTemplateVersion, 2);
+assert.equal(receipt.previewTemplateVersion, 3);
+assert.equal(receipt.publicationBrief.publicationType, "launch");
 assert.equal(receipt.headline, workspace.headline);
 assert.equal(receipt.matrix[0].claimLocation, "headline");
-assert.equal(receipt.matrix[0].evidence[0].sourceType, "internal-study");
-assert.equal(receipt.matrix[0].evidence[0].publishedAt, "2026-08-18");
-assert.match(receipt.matrix[0].evidence[0].rationale, /eight-team pilot/);
-const changedHeadline = workspace.headline.replace("42%.", "42% today.");
+assert.equal(receipt.matrix[0].evidence[0].sourceType, "engineering-control");
+assert.equal(receipt.matrix[0].evidence[0].publishedAt, "2026-08-27");
+assert.match(receipt.matrix[0].evidence[0].rationale, /human approval boundary/);
+const changedHeadline = workspace.headline.replace(
+  "exact final wording.",
+  "final wording in the reviewed revision.",
+);
 const changedHeadlineReceipt = await createProofReceipt({
   ...workspace,
   headline: changedHeadline,
@@ -144,12 +348,22 @@ const changedHeadlineReceipt = await createProofReceipt({
     claim.location === "headline" ? { ...claim, text: changedHeadline } : claim,
   ),
 });
-const changedTypeReceipt = await createProofReceipt({
-  ...workspace,
-  publicationType: "report",
-});
+const changedTypeWorkspace = changePublicationType(workspace, "report");
+await assert.rejects(
+  () => createProofReceipt(changedTypeWorkspace),
+  /RELEASE_BLOCKED.*HUMAN_APPROVAL_REQUIRED/,
+);
+const changedBriefWorkspace = structuredClone(workspace);
+if (
+  !changedBriefWorkspace.publicationBrief ||
+  changedBriefWorkspace.publicationBrief.title.status !== "provided"
+) {
+  throw new Error("EXPECTED_PROVIDED_PUBLICATION_TITLE");
+}
+changedBriefWorkspace.publicationBrief.title.value += " · alternate presentation";
+const changedBriefReceipt = await createProofReceipt(changedBriefWorkspace);
 assert.notEqual(changedHeadlineReceipt.contentHash, receipt.contentHash);
-assert.notEqual(changedTypeReceipt.contentHash, receipt.contentHash);
+assert.notEqual(changedBriefReceipt.contentHash, receipt.contentHash);
 await assert.rejects(
   () =>
     createProofReceipt({
@@ -170,14 +384,20 @@ assert.equal(reportLayoutWorkspace.publicationType, "report");
 assert.equal(reportLayoutWorkspace.revision, workspace.revision + 1);
 assert.equal(reportLayoutWorkspace.receipt, undefined);
 assert.equal(
+  reportLayoutWorkspace.invalidatedReceipt?.receiptId,
+  receipt.receiptId,
+);
+assert.equal(
   reportLayoutWorkspace.audit.at(-1)?.action,
   "PUBLICATION_FORMAT_CHANGED",
 );
-assert.equal(verifyReleaseGate(reportLayoutWorkspace).status, "pass");
+assert.equal(verifyReleaseGate(reportLayoutWorkspace).status, "blocked");
+assert.equal(verifyReleaseGate(reportLayoutWorkspace).openHumanDecisions, 4);
 
 const unknownDraft =
-  "The Arbor pilot enrolled twelve teams. The first review cycle took nineteen minutes. Public exports remain available without an account.";
-const unknownHeadline = "The Arbor pilot enrolled twelve teams.";
+  "The verification exercise included twelve internal review runs. The first review cycle took nineteen minutes. Public exports remain available without an account.";
+const unknownHeadline =
+  "The verification exercise included twelve internal review runs.";
 const candidates = candidateClaimsFromDraft(unknownDraft);
 assert.equal(candidates.length, 3);
 const wrappedDraft =
@@ -194,17 +414,26 @@ assert.deepEqual(candidateClaimsFromDraft("We won. It is documented in the repor
 ]);
 assert.deepEqual(
   candidateClaimsFromDraft(
+    "A source-backed structured heading\n\nA source-backed structured module without terminal punctuation",
+  ),
+  [
+    "A source-backed structured heading",
+    "A source-backed structured module without terminal punctuation",
+  ],
+);
+assert.deepEqual(
+  candidateClaimsFromDraft(
     "A U.S. launch is ready. Dr. Rivera approved the evidence package.",
   ),
   ["A U.S. launch is ready.", "Dr. Rivera approved the evidence package."],
 );
 assert.deepEqual(
   candidateClaimsFromDraft(
-    "The packet includes, e.g. a dated report excerpt. Acme Inc. published the result.",
+    "The packet includes, e.g. a dated report excerpt. Research Corp. published the result.",
   ),
   [
     "The packet includes, e.g. a dated report excerpt.",
-    "Acme Inc. published the result.",
+    "Research Corp. published the result.",
   ],
 );
 assert.throws(
@@ -245,7 +474,7 @@ assert.throws(
   () =>
     candidateClaimsFromDraft(
       Array.from(
-        { length: 12 },
+        { length: 49 },
         (_, index) => `Body sentence ${index + 1} contains enough reviewable text.`,
       ).join(" "),
     ),
@@ -253,7 +482,7 @@ assert.throws(
 );
 
 const oversizedDraft = Array.from(
-  { length: 13 },
+  { length: 49 },
   (_, index) => `Documented release sentence number ${index + 1} has a complete review scope.`,
 ).join(" ");
 assert.throws(() => candidateClaimsFromDraft(oversizedDraft), /TOO_MANY_CANDIDATES/);
@@ -293,7 +522,7 @@ assert.throws(
         })),
         {
           location: "body",
-          text: "twelve teams",
+          text: "twelve internal review runs",
           risk: "medium",
         },
       ],
@@ -324,7 +553,7 @@ assert.throws(
 let unknownWorkspace = createDemoWorkspace();
 unknownWorkspace = replaceReviewPacket(unknownWorkspace, {
   publicationType: "blog-post",
-  title: "Arbor field note",
+  title: "Imported field note",
   headline: unknownHeadline,
   draftText: unknownDraft,
   claims: [
@@ -365,7 +594,7 @@ assert.throws(
       [
         {
           claimId: "claim-01",
-          revisedText: "A fresh Arbor packet awaiting documented evidence.",
+          revisedText: "A fresh review packet awaiting documented evidence.",
           rationale: "The language is narrower, but no source has been linked yet.",
           expectedClaimRevision: 1,
         },
@@ -409,7 +638,7 @@ duplicateClaimWorkspace = stageResolutionBatch(
 );
 const duplicateBeforeApproval = structuredClone(duplicateClaimWorkspace);
 assert.throws(
-  () => decideProposal(duplicateClaimWorkspace, "claim-04", "approve"),
+  () => decideCurrent(duplicateClaimWorkspace, "claim-04", "approve"),
   /AMBIGUOUS_CLAIM_TEXT/,
 );
 assert.equal(duplicateClaimWorkspace.revision, duplicateBeforeApproval.revision);
@@ -431,7 +660,7 @@ assert.throws(
         {
           claimId: "claim-04",
           revisedText:
-            "Joined by 800 people on the 2024 waitlist. Trusted by 999 global enterprises.",
+            "The receipt seals the documented revision. It also proves universal adoption.",
           rationale: "This deliberately tries to introduce a second public claim.",
           expectedClaimRevision: 1,
         },
@@ -447,7 +676,8 @@ assert.throws(
       [
         {
           claimId: "claim-04",
-          revisedText: "Joined by 800 people\n\non the documented Northstar waitlist.",
+          revisedText:
+            "The receipt seals the current revision\n\nand its documented evidence.",
           rationale: "This deliberately attempts to cross a visible preview paragraph.",
           expectedClaimRevision: 1,
         },
@@ -502,7 +732,7 @@ assert.equal(
 );
 assert.equal(duplicateProposalPreview.body, duplicateProposalWorkspace.draftText);
 assert.throws(
-  () => decideProposal(duplicateProposalWorkspace, "claim-04", "approve"),
+  () => decideCurrent(duplicateProposalWorkspace, "claim-04", "approve"),
   /AMBIGUOUS_PUBLICATION_CLAIM/,
 );
 
@@ -551,7 +781,7 @@ assert.equal(
   "HUMAN_APPROVAL_REQUIRED",
 );
 
-unknownWorkspace = approveClaimEvidence(unknownWorkspace, "claim-01");
+unknownWorkspace = approveCurrentEvidence(unknownWorkspace, "claim-01");
 assert.equal(unknownWorkspace.claims[0].humanApproval, "approved");
 assert.equal(verifyReleaseGate(unknownWorkspace).blockers.length, 3);
 assert.equal(unknownWorkspace.audit.at(-1)?.actor, "human");
@@ -575,6 +805,38 @@ let scopedAuditWorkspace = replaceReviewPacket(workspace, {
   ],
   expectedWorkspaceRevision: workspace.revision,
 });
+assert.equal(scopedAuditWorkspace.audit.at(-1)?.actor, "agent");
+assert.equal(scopedAuditWorkspace.id, `workspace-active-review-r${workspace.revision + 1}`);
+assert.notEqual(scopedAuditWorkspace.id, "workspace-proofrail-self-demo");
+assert.equal(scopedAuditWorkspace.sourcePublicationBrief?.provenance[0].kind, "agent-input");
+const humanImportedWorkspace = replaceReviewPacket(
+  workspace,
+  {
+    publicationType: "report",
+    title: "Human import packet",
+    headline: "A human imported this exact public headline.",
+    draftText: "A human imported this exact public body sentence for review.",
+    claims: [
+      {
+        location: "headline",
+        text: "A human imported this exact public headline.",
+        risk: "medium",
+      },
+      {
+        location: "body",
+        text: "A human imported this exact public body sentence for review.",
+        risk: "medium",
+      },
+    ],
+    expectedWorkspaceRevision: workspace.revision,
+  },
+  "human",
+);
+assert.equal(humanImportedWorkspace.audit.at(-1)?.actor, "human");
+assert.equal(
+  humanImportedWorkspace.sourcePublicationBrief?.provenance[0].kind,
+  "human-input",
+);
 scopedAuditWorkspace = attachEvidence(scopedAuditWorkspace, {
   claimId: "claim-01",
   title: "Acceptance record",
@@ -585,7 +847,7 @@ scopedAuditWorkspace = attachEvidence(scopedAuditWorkspace, {
   rationale: "The record directly supports the current release-note wording.",
   expectedWorkspaceRevision: scopedAuditWorkspace.revision,
 });
-scopedAuditWorkspace = approveClaimEvidence(scopedAuditWorkspace, "claim-01");
+scopedAuditWorkspace = approveCurrentEvidence(scopedAuditWorkspace, "claim-01");
 scopedAuditWorkspace = attachEvidence(scopedAuditWorkspace, {
   claimId: "claim-02",
   title: "Acceptance record body copy",
@@ -596,7 +858,7 @@ scopedAuditWorkspace = attachEvidence(scopedAuditWorkspace, {
   rationale: "The record directly supports the current release-note body wording.",
   expectedWorkspaceRevision: scopedAuditWorkspace.revision,
 });
-scopedAuditWorkspace = approveClaimEvidence(scopedAuditWorkspace, "claim-02");
+scopedAuditWorkspace = approveCurrentEvidence(scopedAuditWorkspace, "claim-02");
 const scopedReceipt = await createProofReceipt(scopedAuditWorkspace);
 assert.equal(scopedReceipt.publicationType, "report");
 assert.equal(scopedReceipt.audit[0].action, "PACKET_REPLACED");

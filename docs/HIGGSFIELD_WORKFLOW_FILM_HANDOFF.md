@@ -1,52 +1,26 @@
-# Higgsfield workflow-film handoff
+# Cinematic workflow film — RETIRED
 
-Status: prepared, not generated
+Status: **retired; not an active handoff or implementation plan**
 
-The current signed-out browser session could not create the final clip. No
-Higgsfield credit was spent in this pass. This handoff deliberately separates a
-production-ready prompt from a claim that the render exists.
+The Publication Compiler rebuild does not use a Higgsfield film. The explored
+cinematic direction added a second representation of release state without
+making the real sentence → claim → source → proposal → human decision → gate
+relationship easier to understand.
 
-## Locked source frames
+No film is required for completion, no new generation is planned, and no video
+may be wired into the runtime merely because account credits are available.
 
-- Start: `public/media/proofrail-workflow-start-v1.webp`
-- End: `public/media/proofrail-workflow-end-v1.webp`
-- Aspect ratio: 16:9
-- Composition: one ivory publication sheet, cobalt evidence rail, coral only
-  for unresolved claim tabs, no people, logo, product UI, or customer asset
+If a future product decision reopens cinematic media, it starts as a new,
+human-approved scope with:
 
-The end frame is an illustrative release-ready state. It must only be shown by
-the application when the real ProofRail gate passes.
+1. a state-accurate storyboard;
+2. a low-cost test render;
+3. no generated UI text or implied application state;
+4. a poster and reduced-motion fallback;
+5. provenance and rights documentation;
+6. an explicit performance budget;
+7. full-clip human review before integration; and
+8. a hard rule that media cannot mutate or visually overrule the domain gate.
 
-## Recommended Higgsfield job
-
-Use an official Start & End Frames image-to-video workflow:
-
-- Duration: 5 seconds
-- Test render: 720p
-- Approved final render: 1080p
-- Camera: subtle controlled push-in
-- Audio: none
-- Text and logo generation: disabled / absent from source frames
-
-Prompt:
-
-> Subtle controlled push-in. Editorial evidence fragments align into one precise cobalt review rail. Warm paper, navy ink, restrained studio light. No text, no logos, no people, no floating orb, no explosive effects. Preserve composition and geometry.
-
-## Acceptance gate before integration
-
-1. Start and end geometry match without morphing, duplicated rails, or invented
-   text.
-2. The film reads as draft → evidence alignment → release-ready, not as an
-   automatic publishing action.
-3. No customer logo, quote, KPI, product image, face, voice, or music appears.
-4. C2PA/provenance metadata is retained where the downloaded output provides it.
-5. The MP4 is not wired into the page until a human has reviewed the entire
-   five seconds.
-6. Runtime logic still binds the final reveal to `gate.status === "pass"`; the
-   film can never become evidence of approval on its own.
-
-Official references checked on 2026-08-27:
-
-- [Higgsfield Start & End Frames](https://higgsfield.ai/blog/what-is-first-and-last-frame-animation)
-- [Higgsfield Camera Controls](https://higgsfield.ai/blog/how-to-use-higgsfield-camera-controls)
-- [Higgsfield Terms of Use](https://higgsfield.ai/terms-of-use-agreement)
+Until those conditions are met, the live 2D workspace is the sole product
+explanation.

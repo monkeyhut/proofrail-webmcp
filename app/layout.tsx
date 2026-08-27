@@ -1,31 +1,31 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./premium.css";
 
 export const metadata: Metadata = {
-  title: "ProofRail — Pre-publication claim gate for marketing & PR",
+  metadataBase: new URL("https://proofrail-webmcp.kingacht.chatgpt.site"),
+  title: "ProofRail — See the page. Prove every claim.",
   description:
-    "Preview and check claims in a launch page, project page, blog post, or report against evidence before publishing.",
+    "The pre-publication review room for marketing and PR: preview the real page, connect factual claims to evidence, and keep release locked until a human approves.",
   openGraph: {
-    title: "ProofRail — Pre-publication claim gate for marketing & PR",
+    title: "ProofRail — See the page. Prove every claim.",
     description:
-      "AI checks public claims against linked sources. A human approves. Publish stays locked until every claim clears.",
+      "Preview the real publication, prove every factual claim, and keep release locked until a human approves the exact wording.",
     type: "website",
     images: [
       {
-        url: "/proofrail-social-v3.png",
+        url: "/og-proofrail-v4.png",
         width: 1200,
         height: 630,
-        alt: "ProofRail beside a clean launch-page preview with a visible human publication gate.",
+        alt: "ProofRail publication canvas with an evidence rail stopping at a human-operated release gate.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ProofRail — Pre-publication claim gate for marketing & PR",
+    title: "ProofRail — See the page. Prove every claim.",
     description:
-      "AI checks public claims against linked sources. A human approves. Publish stays locked until every claim clears.",
-    images: ["/proofrail-social-v3.png"],
+      "Preview the real publication, prove every factual claim, and keep release locked until a human approves the exact wording.",
+    images: ["/og-proofrail-v4.png"],
   },
 };
 

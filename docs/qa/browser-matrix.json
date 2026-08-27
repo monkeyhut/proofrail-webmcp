@@ -1,0 +1,458 @@
+{
+  "status": "pass",
+  "baseUrl": "http://127.0.0.1:4176",
+  "generatedAt": "2026-08-27T22:18:37.533Z",
+  "engines": [
+    "chromium",
+    "firefox",
+    "webkit"
+  ],
+  "requiredViewports": [
+    "1920x1080",
+    "1440x1000",
+    "1280x800",
+    "1024x768",
+    "768x1024",
+    "390x844",
+    "360x800",
+    "320x568"
+  ],
+  "results": [
+    {
+      "engine": "chromium",
+      "viewport": "1920x1080",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "1440x1000",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "1280x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "1024x768",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "768x1024",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "390x844",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "360x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "chromium",
+      "viewport": "320x568",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": {
+          "labelsOrFieldsBelow16": 0,
+          "undersizedTargets": 0,
+          "focusTrapAndReturn": "pass"
+        }
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "1920x1080",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "1440x1000",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "1280x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "1024x768",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "768x1024",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "390x844",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "360x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "firefox",
+      "viewport": "320x568",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "1920x1080",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "1440x1000",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "1280x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "1024x768",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "768x1024",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": "not-applicable",
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "390x844",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "360x800",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    },
+    {
+      "engine": "webkit",
+      "viewport": "320x568",
+      "empty": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "mobileImportDialog": "not-applicable"
+      },
+      "loaded": {
+        "overflow": false,
+        "undersizedTargets": 0,
+        "mobileBodyBelow16": 0,
+        "axeCriticalSerious": 0,
+        "releaseCheck": "blocked-as-expected"
+      },
+      "consoleErrors": 0
+    }
+  ]
+}
