@@ -4,8 +4,8 @@
 
 - Public source: https://github.com/monkeyhut/proofrail-webmcp
 - Deployment candidate: https://proofrail-webmcp.kingacht.chatgpt.site
-  (the current site is owner-only; final commit `c1099a8` is saved as Sites
-  version 3 and awaits explicit production-deploy and public-access approval)
+  (the current site is owner-only; the verified PR head awaits explicit merge,
+  production-deploy, and public-access approval)
 
 ## Title
 
