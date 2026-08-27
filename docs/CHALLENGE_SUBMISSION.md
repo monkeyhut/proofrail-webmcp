@@ -1,5 +1,12 @@
 # OpenAI WebMCP Challenge submission kit
 
+## Verified project links
+
+- Public source: https://github.com/monkeyhut/proofrail-webmcp
+- Deployment candidate: https://proofrail-webmcp.kingacht.chatgpt.site
+  (successfully deployed as version 1; still owner-only until public access is
+  explicitly approved)
+
 ## Title
 
 ProofRail — CI for public claims
@@ -85,8 +92,9 @@ receipt is the build artifact.
 - [x] Public-license file
 - [x] Reproducible local verification commands
 - [x] Social preview artwork
-- [ ] Public GitHub repository URL
-- [ ] Live deployment URL
+- [x] Public GitHub repository URL
+- [ ] Public live deployment URL (production deploy passes; public access is
+  still pending)
 - [ ] Public YouTube demo with audio, under three minutes
 - [ ] Devpost description, screenshots, URLs, and final submit
 
