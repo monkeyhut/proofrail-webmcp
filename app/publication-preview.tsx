@@ -98,7 +98,7 @@ export function PublicationPreview({
   const projection = buildPublicationPreview(workspace, variant);
   const renderedVariant = projection.errorCode ? "current" : variant;
   const stagedCount = projection.stagedClaimIds.length;
-  const paragraphs = projection.body.split(/\n\n+/);
+  const paragraphs = projection.body.split(/\r?\n[\t ]*\r?\n+|\u2029+/);
   const bodyClaims = projection.claims.filter((claim) => claim.location === "body");
   const headlineClaims = projection.claims.filter(
     (claim) => claim.location === "headline",

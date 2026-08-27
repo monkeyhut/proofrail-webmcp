@@ -181,6 +181,21 @@ assert.deepEqual(candidateClaimsFromDraft("We won. It is documented in the repor
   "We won.",
   "It is documented in the report.",
 ]);
+assert.deepEqual(
+  candidateClaimsFromDraft(
+    "A U.S. launch is ready. Dr. Rivera approved the evidence package.",
+  ),
+  ["A U.S. launch is ready.", "Dr. Rivera approved the evidence package."],
+);
+assert.deepEqual(
+  candidateClaimsFromDraft(
+    "The packet includes, e.g. a dated report excerpt. Acme Inc. published the result.",
+  ),
+  [
+    "The packet includes, e.g. a dated report excerpt.",
+    "Acme Inc. published the result.",
+  ],
+);
 const shortSentenceDraft =
   "Free. This release completed the documented acceptance review.";
 const shortSentenceCandidates = candidateClaimsFromDraft(shortSentenceDraft);
@@ -406,6 +421,44 @@ assert.throws(
       7,
     ),
   /NON_ATOMIC_REVISION/,
+);
+assert.throws(
+  () =>
+    stageResolutionBatch(
+      createDemoWorkspace(),
+      [
+        {
+          claimId: "claim-04",
+          revisedText: "Joined by 800 people\n\non the documented Northstar waitlist.",
+          rationale: "This deliberately attempts to cross a visible preview paragraph.",
+          expectedClaimRevision: 1,
+        },
+      ],
+      7,
+    ),
+  /CROSS_PARAGRAPH_REVISION/,
+);
+
+const crossParagraphDraft =
+  "A review sentence crosses\n\na visible paragraph before it finishes.";
+assert.throws(
+  () =>
+    replaceReviewPacket(createDemoWorkspace(), {
+      publicationType: "blog-post",
+      title: "Cross-paragraph coverage",
+      headline: "Every visible claim must retain its state marker.",
+      draftText: crossParagraphDraft,
+      claims: [
+        {
+          location: "headline",
+          text: "Every visible claim must retain its state marker.",
+          risk: "medium",
+        },
+        { location: "body", text: crossParagraphDraft, risk: "medium" },
+      ],
+      expectedWorkspaceRevision: 7,
+    }),
+  /CROSS_PARAGRAPH_CLAIM/,
 );
 
 let duplicateProposalWorkspace = createDemoWorkspace();

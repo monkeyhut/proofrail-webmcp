@@ -577,7 +577,7 @@ export function ProofRailApp() {
         name: "stage_resolution_batch",
         title: "Stage claim resolutions",
         description:
-          "Stage one to eight narrow, single-sentence revisions for blocked claims and visible human review. This never approves, publishes, or reopens an already releasable claim. Each claim and the workspace must match the supplied revision numbers.",
+          "Stage one to eight narrow, single-sentence revisions inside the claim's current preview paragraph for blocked claims and visible human review. This never approves, publishes, or reopens an already releasable claim. Each claim and the workspace must match the supplied revision numbers.",
         inputSchema: {
           type: "object",
           properties: {
@@ -593,6 +593,8 @@ export function ProofRailApp() {
                     type: "string",
                     minLength: 3,
                     maxLength: 500,
+                    description:
+                      "One exact public sentence without a paragraph break.",
                   },
                   rationale: {
                     type: "string",

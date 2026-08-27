@@ -176,6 +176,8 @@ export type StageResolutionInput = {
   expectedClaimRevision: number;
 };
 
+const PARAGRAPH_BREAK_PATTERN = /\r?\n[\t ]*\r?\n|\u2029/;
+
 const DEMO_NOW = "2026-08-27T08:00:00.000Z";
 
 const initialClaims: ReviewClaim[] = [
@@ -473,6 +475,11 @@ export function stageResolutionBatch(
     if (revisedText.length < 3 || revisedText.length > 500) {
       throw new Error(
         `INVALID_REVISION: ${claim.id} must be between 3 and 500 characters.`,
+      );
+    }
+    if (PARAGRAPH_BREAK_PATTERN.test(revisedText)) {
+      throw new Error(
+        `CROSS_PARAGRAPH_REVISION: ${claim.id} must remain inside its current preview paragraph.`,
       );
     }
     const revisedSentences = candidateClaimsFromDraft(revisedText);
@@ -939,11 +946,99 @@ export function buildPublicationPreview(
   };
 }
 
+const TITLE_ABBREVIATIONS = new Set([
+  "dr.",
+  "mr.",
+  "mrs.",
+  "ms.",
+  "prof.",
+  "sr.",
+  "jr.",
+  "st.",
+]);
+
+const INLINE_ABBREVIATIONS = new Set(["a.k.a.", "e.g.", "i.e."]);
+
+const LOWERCASE_CONTINUATION_ABBREVIATIONS = new Set([
+  "approx.",
+  "co.",
+  "corp.",
+  "dept.",
+  "etc.",
+  "fig.",
+  "inc.",
+  "ltd.",
+  "no.",
+  "vs.",
+]);
+
+const INITIALISM_SENTENCE_STARTERS = new Set([
+  "a",
+  "an",
+  "after",
+  "before",
+  "however",
+  "it",
+  "our",
+  "results",
+  "that",
+  "the",
+  "these",
+  "they",
+  "this",
+  "those",
+  "we",
+]);
+
+function periodContinuesSentence(left: string, punctuation: string, right: string): boolean {
+  if (punctuation !== ".") return false;
+  const withoutClosers = left.replace(/[\"'’”\)\]]+$/, "").trimEnd();
+  const token = withoutClosers.match(/\S+$/)?.[0] ?? "";
+  const nextToken = right.trimStart().match(/^[\p{L}\p{N}]+/u)?.[0] ?? "";
+  if (!nextToken) return false;
+  if (TITLE_ABBREVIATIONS.has(token.toLowerCase())) return true;
+  if (INLINE_ABBREVIATIONS.has(token.toLowerCase())) return true;
+  if (
+    LOWERCASE_CONTINUATION_ABBREVIATIONS.has(token.toLowerCase()) &&
+    /^[a-z0-9]/.test(nextToken)
+  ) {
+    return true;
+  }
+  if (/^[A-Za-z]\.$/.test(token) && /^[A-Z]/.test(nextToken)) return true;
+  if (/^(?:[A-Za-z]\.){2,}$/.test(token)) {
+    return (
+      /^[a-z0-9]/.test(nextToken) ||
+      !INITIALISM_SENTENCE_STARTERS.has(nextToken.toLowerCase())
+    );
+  }
+  return false;
+}
+
+function splitPublicSentences(draftText: string): string[] {
+  const sentences: string[] = [];
+  const boundaryPattern = /([.!?]+(?:[\"'’”\)\]]+)?)(\s+)/g;
+  let sentenceStart = 0;
+  let boundary: RegExpExecArray | null;
+
+  while ((boundary = boundaryPattern.exec(draftText)) !== null) {
+    const punctuation = boundary[1].match(/[.!?]+/)?.[0] ?? "";
+    const sentenceEnd = boundary.index + boundary[1].length;
+    const left = draftText.slice(sentenceStart, sentenceEnd);
+    const right = draftText.slice(boundaryPattern.lastIndex);
+    if (periodContinuesSentence(left, punctuation, right)) continue;
+
+    const sentence = left.trim();
+    if (sentence) sentences.push(sentence);
+    sentenceStart = boundaryPattern.lastIndex;
+  }
+
+  const remainder = draftText.slice(sentenceStart).trim();
+  if (remainder) sentences.push(remainder);
+  return sentences;
+}
+
 export function candidateClaimsFromDraft(draftText: string): string[] {
-  const sentences = draftText
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
+  const sentences = splitPublicSentences(draftText);
   const oversizedSentence = sentences.find((sentence) => sentence.length > 500);
   if (oversizedSentence) {
     throw new Error(
@@ -964,6 +1059,7 @@ type PublicationCoverageIssue = {
     | "INCOMPLETE_HEADLINE_COVERAGE"
     | "INCOMPLETE_CLAIM_COVERAGE"
     | "NON_ATOMIC_BODY_CLAIM"
+    | "CROSS_PARAGRAPH_CLAIM"
     | "AMBIGUOUS_PUBLICATION_CLAIM"
     | "OVERLAPPING_PUBLICATION_CLAIMS";
   detail: string;
@@ -984,6 +1080,15 @@ function publicationCoverageIssue(
 
   const bodySentences = candidateClaimsFromDraft(draftText);
   const bodyClaims = claims.filter((claim) => claim.location === "body");
+  const crossParagraphClaim = claims.find((claim) =>
+    PARAGRAPH_BREAK_PATTERN.test(claim.text),
+  );
+  if (crossParagraphClaim) {
+    return {
+      code: "CROSS_PARAGRAPH_CLAIM",
+      detail: `${crossParagraphClaim.id} crosses a preview paragraph boundary.`,
+    };
+  }
   const sentenceCounts = new Map<string, number>();
   const claimCounts = new Map<string, number>();
   for (const sentence of bodySentences) {
