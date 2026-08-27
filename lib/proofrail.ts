@@ -1006,9 +1006,10 @@ function periodContinuesSentence(left: string, punctuation: string, right: strin
   }
   if (/^[A-Za-z]\.$/.test(token) && /^[A-Z]/.test(nextToken)) return true;
   if (/^(?:[A-Za-z]\.){2,}$/.test(token)) {
-    return (
-      /^[a-z0-9]/.test(nextToken) ||
-      !INITIALISM_SENTENCE_STARTERS.has(nextToken.toLowerCase())
+    if (/^[a-z0-9]/.test(nextToken)) return true;
+    if (INITIALISM_SENTENCE_STARTERS.has(nextToken.toLowerCase())) return false;
+    throw new Error(
+      `AMBIGUOUS_SENTENCE_BOUNDARY: cannot safely classify “${token} ${nextToken}” as one sentence or two; rewrite the boundary explicitly.`,
     );
   }
   return false;

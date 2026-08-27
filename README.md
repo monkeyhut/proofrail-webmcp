@@ -105,6 +105,10 @@ Individual checks:
   template. It is not a pixel-perfect prediction of a company's CMS or live
   website. The packet title remains internal review metadata and is not inserted
   as unchecked public copy.
+- Sentence extraction recognizes common titles and abbreviations. If an
+  initialism followed by a capitalized word is genuinely ambiguous, import stops
+  with `AMBIGUOUS_SENTENCE_BOUNDARY` instead of silently guessing; rewrite that
+  boundary explicitly and retry.
 - A receipt seals source type, date, URL when supplied, excerpt, relationship,
   rationale, publication type, headline, and final body. Its hash proves
   internal consistency; it is not a digital signature and does not prove source

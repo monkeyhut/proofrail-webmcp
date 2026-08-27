@@ -196,6 +196,13 @@ assert.deepEqual(
     "Acme Inc. published the result.",
   ],
 );
+assert.throws(
+  () =>
+    candidateClaimsFromDraft(
+      "We launched in the U.S. Canada followed one week later.",
+    ),
+  /AMBIGUOUS_SENTENCE_BOUNDARY/,
+);
 const shortSentenceDraft =
   "Free. This release completed the documented acceptance review.";
 const shortSentenceCandidates = candidateClaimsFromDraft(shortSentenceDraft);

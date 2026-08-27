@@ -32,6 +32,9 @@ unknown claim ID, or an ambiguous repeated span fails before state changes.
 Extra partial claims, duplicate sentence text, overlapping spans, unknown risk,
 source-type, or relationship enums, and staged rewrites containing multiple
 sentences also fail in the domain layer rather than relying only on JSON Schema.
+Common titles and abbreviations are recognized, while an initialism followed by
+an ambiguous capitalized token fails with `AMBIGUOUS_SENTENCE_BOUNDARY` instead
+of being silently merged or split.
 
 ### Preview output cannot execute publisher content
 
