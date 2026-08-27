@@ -107,6 +107,10 @@ each public renderer keeps its own information architecture.
 - Motion represents real state changes: hero reveal, format match cut and
   proof-layer reveal. It never suggests that approval or publishing happened.
 - Reduced-motion users receive the same information without those animations.
+- Generated workflow frames and the Meshy dossier study live only in the
+  ProofRail method section. They never enter a simulated customer publication,
+  because doing so would imply that the customer supplied or approved assets
+  they do not own.
 
 ## Rejected patterns
 

@@ -6,6 +6,10 @@ const previewSource = readFileSync(
   new URL("../app/publication-preview.tsx", import.meta.url),
   "utf8",
 );
+const workflowSource = readFileSync(
+  new URL("../app/workflow-cinematic.tsx", import.meta.url),
+  "utf8",
+);
 const heroStart = source.indexOf('<section className="rail-hero"');
 const heroEnd = source.indexOf("{notice &&", heroStart);
 
@@ -98,6 +102,54 @@ for (const publicationType of [
 }
 assert.equal(source.includes("<CinematicVideo"), false, "CLARITY_UNRELATED_VIDEO_PRESENT");
 assert.equal(source.includes("<DeferredProofArtifact"), false, "CLARITY_UNRELATED_3D_PRESENT");
+assert.ok(
+  source.includes("gateStatus={gate.status}") &&
+    source.includes("blockerCount={gate.blockers.length}") &&
+    source.includes("evidenceMapped={evidenceMapped}"),
+  "CLARITY_WORKFLOW_MEDIA_MUST_BIND_TO_REAL_GATE",
+);
+assert.ok(
+  source.includes("workspace.claims.every((claim)") &&
+    workflowSource.includes('data-state={evidenceMapped ? "complete" : "pending"}') &&
+    workflowSource.includes("Evidence incomplete"),
+  "CLARITY_EVIDENCE_STEP_MUST_REFLECT_COMPLETE_EDGE_COVERAGE",
+);
+assert.ok(
+  workflowSource.includes('const gatePassed = gateStatus === "pass"') &&
+    workflowSource.includes("stopped at the human gate"),
+  "CLARITY_CINEMATIC_MUST_FAIL_CLOSED_AT_HUMAN_GATE",
+);
+assert.equal(
+  workflowSource.includes("release-ready receipt"),
+  false,
+  "CLARITY_GATE_PASS_MUST_NOT_PRETEND_RECEIPT_EXISTS",
+);
+assert.ok(
+  workflowSource.includes("It never changes claims") &&
+    workflowSource.includes("the release gate") &&
+    workflowSource.includes("or the receipt"),
+  "CLARITY_CINEMATIC_MUST_DISCLOSE_NON_MUTATING_CONCEPT_MEDIA",
+);
+assert.ok(
+  workflowSource.includes("prefers-reduced-motion: reduce"),
+  "CLARITY_CINEMATIC_REDUCED_MOTION_MISSING",
+);
+assert.equal(
+  workflowSource.includes("<video"),
+  false,
+  "CLARITY_UNREVIEWED_VIDEO_RUNTIME_PRESENT",
+);
+assert.equal(
+  workflowSource.includes("<model-viewer"),
+  false,
+  "CLARITY_UNREVIEWED_3D_RUNTIME_PRESENT",
+);
+assert.equal(
+  previewSource.includes("proofrail-workflow-") ||
+    previewSource.includes("proofrail-evidence-dossier-"),
+  false,
+  "CLARITY_CONCEPT_MEDIA_MUST_NOT_IMPLY_CUSTOMER_PUBLICATION_ASSETS",
+);
 assert.equal(
   previewSource.includes("paragraphs.slice(0,"),
   false,

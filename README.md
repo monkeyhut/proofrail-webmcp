@@ -95,9 +95,10 @@ Individual checks:
 - Quantitative preview modules are fail-closed: units remain attached, absent
   metrics do not become decorative KPIs, and public reports never expose the
   workspace's internal evidence titles.
-- The rejected decorative 3D/video direction is not loaded by the active page:
-  browser QA reports zero video and zero canvas elements, and the Three.js
-  runtime is no longer a dependency.
+- The rejected decorative 3D/video direction is not loaded by the active page.
+  The replacement uses state-bound static workflow frames and a disclosed Meshy
+  poster in ProofRail's method section; browser QA still reports zero video and
+  zero canvas elements, and the Three.js runtime is no longer a dependency.
 - ESLint passes.
 - Production build passes.
 - npm audit reports zero known vulnerabilities after pinned security overrides.

@@ -10,9 +10,9 @@ this working checklist.
 | Criterion | ProofRail evidence |
 | --- | --- |
 | WebMCP Leverage | Six narrow page-owned tools cover live draft inspection, evidence attachment, revision-locked proposals, gate verification, and receipt export. Human approval is deliberately not exposed as a tool. |
-| Execution | The working UI shows the complete publication in four type-specific simulated layouts, plus the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, narrow-viewport, desktop-browser, and no-overflow checks are repeatable. The active UI loads no decorative video or 3D runtime. |
+| Execution | The working UI shows the complete publication in four type-specific simulated layouts, plus the full blocked → agent proposal → human decision → deterministic release → receipt path. Domain, clarity, lint, type, build, narrow-viewport, desktop-browser, and no-overflow checks are repeatable. A user-controlled method sequence is bound to the live gate and fails closed; the disclosed Meshy study is a static poster. The active UI loads no decorative video or interactive 3D runtime. |
 | Potential Impact | Marketing and PR teams can preview and control factual claims in launch pages, project pages, blog posts, and reports before those words reach the public. |
-| Creativity & Ambition | ProofRail applies CI concepts—tests, patches, protected review, and build receipts—to public language without pretending that an agent is a truth oracle. |
+| Creativity & Ambition | ProofRail applies CI concepts—tests, patches, protected review, and build receipts—to public language without pretending that an agent is a truth oracle. Its premium media system is also state-bound: cinematic motion can explain a gate, but cannot visually overrule it. |
 
 ## Required deliverables
 

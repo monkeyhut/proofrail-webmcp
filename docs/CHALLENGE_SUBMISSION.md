@@ -96,11 +96,14 @@ receipt is the build artifact.
 The opening frame explains the product and shows the real launch-page output at
 the same time. Each accepted input has its own publication grammar: project
 case study, editorial blog, launch page, or formal report. The active interface
-uses no decorative 3D model or generated film; its cinematic motion comes from
-masked typography, ruled layouts, and the actual draft → evidence → human →
-publish state change. Several MotionSites member examples informed editorial
-scale, asymmetric composition, workflow logic, and controlled transitions;
-none of their prompts, code, or hosted assets is copied.
+uses no video or interactive 3D runtime. A disclosed two-frame workflow study
+can move only as far as the real gate allows, and a static Meshy dossier makes
+the review layers tangible without entering any customer publication preview.
+Its other cinematic motion comes from masked typography, ruled layouts, and the
+actual draft → evidence → human → release-ready state change. Several
+MotionSites member examples informed editorial scale, asymmetric composition,
+workflow logic, and controlled transitions; none of their prompts, code, or
+hosted assets is copied.
 
 ## Submission checklist
 

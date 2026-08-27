@@ -30,6 +30,7 @@ import {
   type HeroFocalPoint,
   type PreviewProfile,
 } from "./publication-preview";
+import { WorkflowCinematic } from "./workflow-cinematic";
 
 type ToolStatus = "checking" | "registered" | "unsupported" | "error";
 
@@ -233,6 +234,18 @@ export function ProofRailApp() {
   }, []);
 
   const gate = useMemo(() => verifyReleaseGate(workspace), [workspace]);
+  const evidenceMapped = useMemo(
+    () =>
+      workspace.claims.length > 0 &&
+      workspace.claims.every((claim) =>
+        workspace.edges.some(
+          (edge) =>
+            edge.claimId === claim.id &&
+            workspace.evidence.some((record) => record.id === edge.evidenceId),
+        ),
+      ),
+    [workspace.claims, workspace.edges, workspace.evidence],
+  );
   const selectedClaim =
     workspace.claims.find((claim) => claim.id === selectedClaimId) ??
     workspace.claims[0];
@@ -1135,11 +1148,16 @@ export function ProofRailApp() {
           </div>
         )}
 
-        <section className="rail-method" aria-labelledby="method-title">
+        <section className="rail-method" id="method" aria-labelledby="method-title">
           <header className="rail-section-head">
             <p>One source in. A defensible publication out.</p>
             <h2 id="method-title">The logic, without the AI theatre.</h2>
           </header>
+          <WorkflowCinematic
+            gateStatus={gate.status}
+            blockerCount={gate.blockers.length}
+            evidenceMapped={evidenceMapped}
+          />
           <div className="rail-method__grid">
             <article tabIndex={0}>
               <span className="rail-method__index">01 / Import</span>
